@@ -1,30 +1,24 @@
 namespace StajApi.Models;
 
 /// <summary>
-/// Stajyer bilgilerini temsil eder.
+/// Stajyer oluşturma ve güncelleme isteklerinde gönderilecek bilgileri temsil eder.
 /// </summary>
-public class Stajyer
+public class StajyerRequest
 {
-    /// <summary>
-    /// Stajyerin benzersiz kimlik numarasıdır.
-    /// </summary>
-    /// <example>1</example>
-    public int Id { get; set; }
-
     /// <summary>
     /// Stajyerin adıdır.
     /// </summary>
-    /// <example>Ayşe</example>
+    /// <example>Kaan</example>
     public string Ad { get; set; } = string.Empty;
 
     /// <summary>
     /// Stajyerin soyadıdır.
     /// </summary>
-    /// <example>Demir</example>
+    /// <example>Kesen</example>
     public string Soyad { get; set; } = string.Empty;
 
     /// <summary>
-    /// Stajyerin çalıştığı departmandır.
+    /// Stajyerin çalışacağı departmandır.
     /// </summary>
     /// <example>Yazılım</example>
     public string Departman { get; set; } = string.Empty;
@@ -32,11 +26,11 @@ public class Stajyer
     /// <summary>
     /// Stajyerin işe başlangıç tarihidir.
     /// </summary>
-    /// <example>2026-07-23</example>
+    /// <example>2026-07-21</example>
     public DateOnly BaslangicTarihi { get; set; }
 
     /// <summary>
-    /// Stajyerin aktif olarak çalışıp çalışmadığını belirtir.
+    /// Stajyerin aktif olup olmadığını belirtir.
     /// </summary>
     /// <example>true</example>
     public bool AktifMi { get; set; }
