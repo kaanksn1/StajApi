@@ -1,0 +1,24 @@
+@StajApi_HostAddress = http://localhost:5039
+
+GET {{StajApi_HostAddress}}/api/stajyerler
+Accept: application/json
+
+###
+
+GET {{StajApi_HostAddress}}/api/stajyerler/1
+Accept: application/json
+
+###
+
+POST {{StajApi_HostAddress}}/api/stajyerler
+Content-Type: application/json
+
+{
+  "ad": "Ayşe",
+  "soyad": "Demir",
+  "departman": "Yazılım",
+  "baslangicTarihi": "2026-07-27",
+  "aktifMi": true
+}
+
+###
