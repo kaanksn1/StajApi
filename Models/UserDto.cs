@@ -1,18 +1,25 @@
 namespace StajApi.Models;
 
 /// <summary>
-/// DTO (Data Transfer Object): İstemciye (ön yüze veya Swagger'a) 
-/// geri döneceğimiz kullanıcı verisinin formatıdır.
-/// System.Guid tipinde eşsiz bir kimlik (Id) barındırır.
+/// API'nin istemciye döndürdüğü kullanıcı verisini temsil eder.
 /// </summary>
 public class UserDto
 {
-    // Guid: Benzersiz (unique) 128-bitlik alfanümerik kimlik değeridir.
+    /// <summary>
+    /// Kullanıcının benzersiz Guid kimlik değeridir.
+    /// </summary>
+    /// <example>11111111-1111-1111-1111-111111111111</example>
     public Guid Id { get; set; }
 
-    // Kullanıcının adı
+    /// <summary>
+    /// Kullanıcının adıdır.
+    /// </summary>
+    /// <example>Fatih</example>
     public string Name { get; set; } = string.Empty;
 
-    // Kullanıcının e-posta adresi
+    /// <summary>
+    /// Kullanıcının email adresidir.
+    /// </summary>
+    /// <example>fatih.ulus@pointr.tech</example>
     public string Email { get; set; } = string.Empty;
 }

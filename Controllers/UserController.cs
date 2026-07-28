@@ -3,114 +3,146 @@ using StajApi.Models;
 
 namespace StajApi.Controllers;
 
-// [ApiController]: Bu sınıfın bir Web API Controller olduğunu framework'e bildirir.
-// Otomatik model doğrulama (Validation) ve HTTP istek yönlendirmelerini sağlar.
-[ApiController]
-
-// [Route]: API'nin hangi URL adresi üzerinden erişileceğini belirler.
-// "api/[controller]" ifadesi, Controller kelimesi atılarak "api/user" adresini oluşturur.
-[Route("api/[controller]")]
+[ApiController] // Bu sınıfın bir Web API controller'ı olduğunu belirtir.
+[Route("api/[controller]")] // Controller adından /api/User adresini oluşturur.
+[Produces("application/json")] // Endpointlerin JSON cevap ürettiğini Swagger'a bildirir.
 public class UserController : ControllerBase
 {
-    // Henüz veritabanı (Database) bağlamadığımız için verileri bellekte (In-Memory) tutuyoruz.
-    // 'static' yapmamızın sebebi: Her HTTP isteğinde controller yeniden örneklendiğinde verilerin kaybolmamasıdır.
-    private static List<UserDto> _users = new List<UserDto>
-    {
-        // Eğitmenin örnek şablonunda belirttiği başlangıç verileri:
-        new UserDto { Id = Guid.NewGuid(), Name = "Fatih", Email = "fatih.ulus@pointr.tech" },
-        new UserDto { Id = Guid.NewGuid(), Name = "Rüstem", Email = "rustem.akkaya@pointr.tech" }
-    };
+    // Veritabanı olmadığı için kullanıcılar uygulama belleğinde tutulur.
+    private static readonly List<UserDto> Users =
+    [
+        new UserDto
+        {
+            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            Name = "Fatih",
+            Email = "fatih.ulus@pointr.tech"
+        },
+        new UserDto
+        {
+            Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            Name = "Rüstem",
+            Email = "rustem.akkaya@pointr.tech"
+        }
+    ];
 
     /// <summary>
-    /// 1. HTTP GET - Tüm Kullanıcıları Listeleme
-    /// Adres: GET /api/user
+    /// Tüm kullanıcıları listeler.
     /// </summary>
+    /// <returns>Kullanıcı listesini döndürür.</returns>
+    /// <response code="200">Kullanıcı listesi başarıyla getirildi.</response>
     [HttpGet]
-    public IActionResult GetAll()
+    [ProducesResponseType(typeof(List<UserDto>), StatusCodes.Status200OK)]
+    public ActionResult<List<UserDto>> GetAll()
     {
-        // Ok(): HTTP 200 Başarılı durum kodu ile birlikte JSON listesini döner.
-        return Ok(_users);
+        return Ok(Users);
     }
 
     /// <summary>
-    /// 2. HTTP GET - Tek Bir Kullanıcıyı Id ile Getirme
-    /// Adres: GET /api/user/{id} (Örn: /api/user/d23f...
+    /// Belirtilen Guid ID değerine sahip kullanıcıyı getirir.
     /// </summary>
-    [HttpGet("{id}")]
-    public IActionResult GetById(Guid id)
+    /// <param name="id">Getirilecek kullanıcının Guid ID değeridir.</param>
+    /// <returns>Bulunan kullanıcıyı döndürür.</returns>
+    /// <response code="200">Kullanıcı başarıyla bulundu.</response>
+    /// <response code="404">Kullanıcı bulunamadı.</response>
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public ActionResult<UserDto> GetById(Guid id)
     {
-        // FirstOrDefault: LINQ sorgusu ile listede verilen Id'ye sahip ilk elemanı arar.
-        var user = _users.FirstOrDefault(u => u.Id == id);
+        UserDto? user = Users.FirstOrDefault(u => u.Id == id);
 
-        // Kullanıcı bulunamazsa HTTP 404 Not Found yanıtı dönülür.
-        if (user == null)
-            return NotFound("Aranan kullanıcı bulunamadı.");
+        if (user is null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                Message = "Aranan kullanıcı bulunamadı."
+            });
+        }
 
-        // Bulunursa HTTP 200 OK ve kullanıcı verisi dönülür.
         return Ok(user);
     }
 
     /// <summary>
-    /// 3. HTTP POST - Yeni Kullanıcı Oluşturma
-    /// Adres: POST /api/user
+    /// Name ve Email bilgileriyle yeni kullanıcı oluşturur.
     /// </summary>
+    /// <param name="model">Request body içerisinden alınan kullanıcı bilgileridir.</param>
+    /// <returns>Oluşturulan kullanıcıyı döndürür.</returns>
+    /// <response code="201">Kullanıcı başarıyla oluşturuldu.</response>
     [HttpPost]
-    public IActionResult Create([FromBody] UserCreateModel model)
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
+    public ActionResult<UserDto> Create([FromBody] UserCreateModel model)
     {
-        // [FromBody]: Gelen verinin HTTP Request Body (JSON) içinden okunacağını belirtir.
-        
-        // Yeni bir DTO oluşturup benzersiz GUID kimliğini burada atıyoruz.
-        var newUser = new UserDto
+        UserDto newUser = new UserDto
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.NewGuid(), // ID istemciden alınmaz, API tarafından üretilir.
             Name = model.Name,
             Email = model.Email
         };
 
-        // Bellekteki listemize ekliyoruz.
-        _users.Add(newUser);
+        Users.Add(newUser);
 
-        // Eklenen yeni kullanıcıyı geri dönüyoruz.
-        return Ok(newUser);
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = newUser.Id },
+            newUser
+        );
     }
 
     /// <summary>
-    /// 4. HTTP PUT - Kullanıcı Adı Güncelleme
-    /// Adres: PUT /api/user/{id}
-    /// KURAL: Id ve Email DEĞİŞTİRİLEMEZ. Sadece Name değiştirilebilir.
+    /// Kullanıcının yalnızca Name alanını günceller.
     /// </summary>
-    [HttpPut("{id}")]
-    public IActionResult Update(Guid id, [FromBody] UserUpdateModel model)
+    /// <param name="id">Güncellenecek kullanıcının Guid ID değeridir.</param>
+    /// <param name="model">Yalnızca yeni Name bilgisini içeren request body'dir.</param>
+    /// <returns>Güncelleme sonucunu içeren mesajı döndürür.</returns>
+    /// <response code="200">Kullanıcı başarıyla güncellendi.</response>
+    /// <response code="404">Kullanıcı bulunamadı.</response>
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(typeof(UserActionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    public ActionResult<UserActionResponse> Update(Guid id, [FromBody] UserUpdateModel model)
     {
-        // Güncellenecek kullanıcıyı listede buluyoruz.
-        var user = _users.FirstOrDefault(u => u.Id == id);
+        UserDto? user = Users.FirstOrDefault(u => u.Id == id);
 
-        if (user == null)
-            return NotFound("Güncellenmek istenen kullanıcı bulunamadı.");
+        if (user is null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                Message = "Güncellenmek istenen kullanıcı bulunamadı."
+            });
+        }
 
-        // Kurala uygun şekilde SADECE Name alanını güncelliyoruz. Id ve Email dokunulmadan kalıyor.
+        // UserUpdateModel yalnız Name içerdiği için Id ve Email değiştirilemez.
         user.Name = model.Name;
 
-        // Eğitmenin istediği özel yanıt formatı: { "User \"Id\" updated" }
-        return Ok($"User \"{id}\" updated");
+        return Ok(new UserActionResponse
+        {
+            Message = $"User \"{id}\" updated"
+        });
     }
 
     /// <summary>
-    /// 5. HTTP DELETE - Kullanıcı Silme
-    /// Adres: DELETE /api/user/{id}
+    /// Belirtilen Guid ID değerine sahip kullanıcıyı siler.
     /// </summary>
-    [HttpDelete("{id}")]
+    /// <param name="id">Silinecek kullanıcının Guid ID değeridir.</param>
+    /// <response code="204">Kullanıcı başarıyla silindi.</response>
+    /// <response code="404">Kullanıcı bulunamadı.</response>
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public IActionResult Delete(Guid id)
     {
-        // Silinecek kullanıcıyı buluyoruz.
-        var user = _users.FirstOrDefault(u => u.Id == id);
+        UserDto? user = Users.FirstOrDefault(u => u.Id == id);
 
-        if (user == null)
-            return NotFound("Silinmek istenen kullanıcı bulunamadı.");
+        if (user is null)
+        {
+            return NotFound(new ErrorResponse
+            {
+                Message = "Silinmek istenen kullanıcı bulunamadı."
+            });
+        }
 
-        // Kullanıcıyı listeden siliyoruz.
-        _users.Remove(user);
+        Users.Remove(user);
 
-        return Ok($"User \"{id}\" deleted");
+        return NoContent();
     }
 }

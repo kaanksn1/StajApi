@@ -1,15 +1,20 @@
 namespace StajApi.Models;
 
 /// <summary>
-/// Kullanıcı kayıt/oluşturma (POST) isteği atılırken istemciden (Swagger/Postman)
-/// bize gelecek olan veri kalıbıdır.
-/// ID istemci tarafından verilmez, sistem tarafından otomatik üretilir.
+/// Yeni kullanıcı oluşturma isteğinin request body modelidir.
+/// ID istemciden alınmaz; API tarafından otomatik üretilir.
 /// </summary>
 public class UserCreateModel
 {
-    // Yeni kullanıcının adı ve soyadı
+    /// <summary>
+    /// Yeni kullanıcının adıdır.
+    /// </summary>
+    /// <example>Fatih</example>
     public string Name { get; set; } = string.Empty;
 
-    // Yeni kullanıcının e-posta adresi
+    /// <summary>
+    /// Yeni kullanıcının email adresidir.
+    /// </summary>
+    /// <example>fatih.ulus@pointr.tech</example>
     public string Email { get; set; } = string.Empty;
 }
