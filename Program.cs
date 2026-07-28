@@ -1,8 +1,18 @@
-using Microsoft.OpenApi; //open api sınıfını kullanmamızı saglar
+using Microsoft.OpenApi;
+using Microsoft.EntityFrameworkCore;
+using StajApi.Data;
+using StajApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+
+// PostgreSQL Veritabanı Bağlantısı (DbContext)
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Service ve Interface Kaydı
+builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddSwaggerGen(options =>
 {
