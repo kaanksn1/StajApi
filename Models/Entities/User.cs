@@ -1,4 +1,4 @@
-namespace StajApi.Models;
+namespace StajApi.Models.Entities;
 
 /// <summary>
 /// Veritabanındaki 'Users' tablosuna denk gelen Entity sınıfımızdır.
@@ -6,10 +6,9 @@ namespace StajApi.Models;
 public class User
 {
     /// <summary>
-    /// EF Core "Id" ve "int" ikilisini gördüğü an bunu Otomatik Artan (Identity/Serial) yapar.
-    /// DB kendisi 1, 2, 3... diye sırayla değer atar.
+    /// Kullanıcının API tarafından üretilen benzersiz Guid kimliğidir.
     /// </summary>
-    public int Id { get; set; }
+    public Guid Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
 

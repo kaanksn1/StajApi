@@ -2,10 +2,15 @@ using Microsoft.OpenApi;
 using Microsoft.EntityFrameworkCore;
 using StajApi.Data;
 using StajApi.Services;
+using StajApi.ExceptionHandling;
+using StajApi.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 // PostgreSQL Veritabanı Bağlantısı (DbContext)
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -42,6 +47,8 @@ if (app.Environment.IsDevelopment()) // gereksiz bilgileri dışarıya açmamak 
 }
 
 app.UseHttpsRedirection();
+
+app.UseExceptionHandler();
 
 app.UseAuthorization();
 

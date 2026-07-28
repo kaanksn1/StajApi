@@ -1,25 +1,59 @@
 using Microsoft.EntityFrameworkCore;
-using StajApi.Models;
+using StajApi.Models.Entities;
 
 namespace StajApi.Data;
 
 /// <summary>
-/// AppDbContext, Entity Framework Core'un veritabanı ile haberleşmesini sağlayan ana sınıftır.
-/// Veritabanı bağlantı konfigürasyonlarını ve tabloların tanımını barındırır.
+/// Entity Framework Core ile PostgreSQL arasındaki bağlantıyı ve tablo kurallarını tanımlar.
 /// </summary>
 public class AppDbContext : DbContext
 {
-    /// <summary>
-    /// DbContext constructor'ı. Veritabanı bağlantı seçenekleri (Connection String vb.)
-    /// Dependency Injection (DI) aracılığıyla dışarıdan buraya aktarılır.
-    /// </summary>
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }
 
     /// <summary>
-    /// Users mülkü (DbSet), veritabanımızdaki "Users" tablosunu temsil eder.
-    /// Kod içerisinde _context.Users diyerek veritabanı sorguları atabiliriz.
+    /// Veritabanındaki Users tablosunu temsil eder.
     /// </summary>
-    public DbSet<User> Users { get; set; }
+    public DbSet<User> Users => Set<User>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("Users");
+            entity.HasKey(user => user.Id);
+
+            entity.Property(user => user.Id)
+                .ValueGeneratedNever();
+
+            entity.Property(user => user.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(user => user.Email)
+                .IsRequired()
+                .HasMaxLength(254);
+
+            entity.HasIndex(user => user.Email)
+                .IsUnique();
+
+            entity.HasData(
+                new User
+                {
+                    Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                    Name = "Fatih",
+                    Email = "fatih.ulus@pointr.tech"
+                },
+                new User
+                {
+                    Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                    Name = "Rüstem",
+                    Email = "rustem.akkaya@pointr.tech"
+                }
+            );
+        });
+    }
 }

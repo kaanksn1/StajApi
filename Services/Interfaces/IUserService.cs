@@ -1,6 +1,7 @@
-using StajApi.Models;
+using StajApi.Models.Requests;
+using StajApi.Models.Responses;
 
-namespace StajApi.Services;
+namespace StajApi.Services.Interfaces;
 
 /// <summary>
 /// Service katmanımızın sözleşmesidir (Interface).
@@ -12,25 +13,25 @@ public interface IUserService
     /// <summary>
     /// Veritabanındaki tüm kullanıcıları getirir.
     /// </summary>
-    Task<List<User>> GetAllUsersAsync();
+    Task<List<UserDto>> GetAllAsync();
 
     /// <summary>
     /// Belirtilen ID'ye sahip tek bir kullanıcıyı getirir.
     /// </summary>
-    Task<User?> GetUserByIdAsync(int id);
+    Task<UserDto> GetByIdAsync(Guid id);
 
     /// <summary>
     /// Yeni bir kullanıcı oluşturur ve veritabanına kaydeder.
     /// </summary>
-    Task<User> CreateUserAsync(User user);
+    Task<UserDto> CreateAsync(UserCreateModel model);
 
     /// <summary>
     /// Var olan bir kullanıcının bilgilerini günceller.
     /// </summary>
-    Task<bool> UpdateUserAsync(int id, User user);
+    Task<UserActionResponse> UpdateAsync(Guid id, UserUpdateModel model);
 
     /// <summary>
     /// Belirtilen ID'ye sahip kullanıcıyı veritabanından siler.
     /// </summary>
-    Task<bool> DeleteUserAsync(int id);
+    Task DeleteAsync(Guid id);
 }

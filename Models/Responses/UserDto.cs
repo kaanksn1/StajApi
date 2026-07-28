@@ -1,4 +1,4 @@
-namespace StajApi.Models;
+namespace StajApi.Models.Responses;
 
 /// <summary>
 /// API'nin istemciye döndürdüğü kullanıcı verisini temsil eder.

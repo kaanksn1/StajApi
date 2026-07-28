@@ -1,29 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
 using StajApi.Models;
+using StajApi.Models.Requests;
+using StajApi.Models.Responses;
+using StajApi.Services.Interfaces;
 
 namespace StajApi.Controllers;
 
-[ApiController] // Bu sınıfın bir Web API controller'ı olduğunu belirtir.
-[Route("api/[controller]")] // Controller adından /api/User adresini oluşturur.
-[Produces("application/json")] // Endpointlerin JSON cevap ürettiğini Swagger'a bildirir.
+[ApiController]
+[Route("api/[controller]")]
+[Produces("application/json")]
 public class UserController : ControllerBase
 {
-    // Veritabanı olmadığı için kullanıcılar uygulama belleğinde tutulur.
-    private static readonly List<UserDto> Users =
-    [
-        new UserDto
-        {
-            Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            Name = "Fatih",
-            Email = "fatih.ulus@pointr.tech"
-        },
-        new UserDto
-        {
-            Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
-            Name = "Rüstem",
-            Email = "rustem.akkaya@pointr.tech"
-        }
-    ];
+    private readonly IUserService _userService;
+
+    public UserController(IUserService userService)
+    {
+        _userService = userService;
+    }
 
     /// <summary>
     /// Tüm kullanıcıları listeler.
@@ -32,9 +25,9 @@ public class UserController : ControllerBase
     /// <response code="200">Kullanıcı listesi başarıyla getirildi.</response>
     [HttpGet]
     [ProducesResponseType(typeof(List<UserDto>), StatusCodes.Status200OK)]
-    public ActionResult<List<UserDto>> GetAll()
+    public async Task<ActionResult<List<UserDto>>> GetAll()
     {
-        return Ok(Users);
+        return Ok(await _userService.GetAllAsync());
     }
 
     /// <summary>
@@ -47,19 +40,9 @@ public class UserController : ControllerBase
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public ActionResult<UserDto> GetById(Guid id)
+    public async Task<ActionResult<UserDto>> GetById(Guid id)
     {
-        UserDto? user = Users.FirstOrDefault(u => u.Id == id);
-
-        if (user is null)
-        {
-            return NotFound(new ErrorResponse
-            {
-                Message = "Aranan kullanıcı bulunamadı."
-            });
-        }
-
-        return Ok(user);
+        return Ok(await _userService.GetByIdAsync(id));
     }
 
     /// <summary>
@@ -68,18 +51,13 @@ public class UserController : ControllerBase
     /// <param name="model">Request body içerisinden alınan kullanıcı bilgileridir.</param>
     /// <returns>Oluşturulan kullanıcıyı döndürür.</returns>
     /// <response code="201">Kullanıcı başarıyla oluşturuldu.</response>
+    /// <response code="409">Email adresi başka bir kullanıcı tarafından kullanılıyor.</response>
     [HttpPost]
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
-    public ActionResult<UserDto> Create([FromBody] UserCreateModel model)
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<UserDto>> Create([FromBody] UserCreateModel model)
     {
-        UserDto newUser = new UserDto
-        {
-            Id = Guid.NewGuid(), // ID istemciden alınmaz, API tarafından üretilir.
-            Name = model.Name,
-            Email = model.Email
-        };
-
-        Users.Add(newUser);
+        UserDto newUser = await _userService.CreateAsync(model);
 
         return CreatedAtAction(
             nameof(GetById),
@@ -99,25 +77,12 @@ public class UserController : ControllerBase
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(UserActionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public ActionResult<UserActionResponse> Update(Guid id, [FromBody] UserUpdateModel model)
+    public async Task<ActionResult<UserActionResponse>> Update(
+        Guid id,
+        [FromBody] UserUpdateModel model
+    )
     {
-        UserDto? user = Users.FirstOrDefault(u => u.Id == id);
-
-        if (user is null)
-        {
-            return NotFound(new ErrorResponse
-            {
-                Message = "Güncellenmek istenen kullanıcı bulunamadı."
-            });
-        }
-
-        // UserUpdateModel yalnız Name içerdiği için Id ve Email değiştirilemez.
-        user.Name = model.Name;
-
-        return Ok(new UserActionResponse
-        {
-            Message = $"User \"{id}\" updated"
-        });
+        return Ok(await _userService.UpdateAsync(id, model));
     }
 
     /// <summary>
@@ -129,20 +94,9 @@ public class UserController : ControllerBase
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public IActionResult Delete(Guid id)
+    public async Task<IActionResult> Delete(Guid id)
     {
-        UserDto? user = Users.FirstOrDefault(u => u.Id == id);
-
-        if (user is null)
-        {
-            return NotFound(new ErrorResponse
-            {
-                Message = "Silinmek istenen kullanıcı bulunamadı."
-            });
-        }
-
-        Users.Remove(user);
-
+        await _userService.DeleteAsync(id);
         return NoContent();
     }
 }

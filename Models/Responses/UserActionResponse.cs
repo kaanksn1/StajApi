@@ -1,4 +1,4 @@
-namespace StajApi.Models;
+namespace StajApi.Models.Responses;
 
 /// <summary>
 /// Kullanıcı işleminin sonucunu içeren mesaj cevabını temsil eder.
