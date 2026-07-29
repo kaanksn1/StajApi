@@ -1,5 +1,6 @@
 using Microsoft.OpenApi;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using StajApi.Data;
 using StajApi.Services;
 using StajApi.ExceptionHandling;
@@ -39,6 +40,12 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+});
 
 if (app.Environment.IsDevelopment()) // gereksiz bilgileri dışarıya açmamak için yalnız geliştirme ortamında çalışır
 {
