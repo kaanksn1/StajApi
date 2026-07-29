@@ -13,7 +13,6 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
         IConfiguration configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json")
-            .AddUserSecrets<AppDbContextFactory>(optional: true)
             .AddEnvironmentVariables()
             .Build();
 
