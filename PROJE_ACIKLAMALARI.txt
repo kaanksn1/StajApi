@@ -1,0 +1,697 @@
+STAJ API PROJE AÇIKLAMALARI
+===========================
+
+1. PROJENİN GENEL ÇALIŞMA AKIŞI
+-------------------------------
+
+Projede bir HTTP isteği aşağıdaki sırayla ilerler:
+
+Request Body
+    -> Model Binding
+    -> Model Validation
+    -> UserController
+    -> IUserService
+    -> UserService
+    -> AppDbContext
+    -> PostgreSQL
+
+Controller HTTP isteğini karşılar. Asıl kullanıcı arama, ekleme,
+güncelleme ve silme işlemleri UserService içerisinde yapılır.
+AppDbContext ise C# kodu ile PostgreSQL arasındaki bağlantıyı sağlar.
+
+
+2. INTERFACE NEDİR?
+-------------------
+
+IUserService bir interface'tir. Interface, service sınıfının hangi
+metotları sağlamak zorunda olduğunu belirleyen bir sözleşmedir.
+
+IUserService içerisindeki metotlar:
+
+Task<List<UserDto>> GetAllAsync();
+Task<UserDto> GetByIdAsync(Guid id);
+Task<UserDto> CreateAsync(UserCreateModel model);
+Task<UserActionResponse> UpdateAsync(Guid id, UserUpdateModel model);
+Task DeleteAsync(Guid id);
+
+Interface bu işlemlerin nasıl yapılacağını yazmaz. İşlemlerin gerçek
+kodları UserService içerisinde bulunur.
+
+UserService şu şekilde interface'i uygular:
+
+public class UserService : IUserService
+
+Bu ifade UserService sınıfının IUserService içerisindeki bütün metotları
+uygulamak zorunda olduğunu gösterir.
+
+Hocaya kısa cevap:
+
+"Interface service katmanının sözleşmesidir. Controller doğrudan somut
+UserService sınıfına değil IUserService interface'ine bağlı çalışır."
+
+
+3. DEPENDENCY INJECTION VE SERVICE ÇAĞRISI
+------------------------------------------
+
+Program.cs içerisinde interface ile service eşleştirilir:
+
+builder.Services.AddScoped<IUserService, UserService>();
+
+Bu satırın anlamı:
+
+"Bir sınıf IUserService istediğinde ona UserService nesnesi ver."
+
+Controller service'i constructor üzerinden alır:
+
+private readonly IUserService _userService;
+
+public UserController(IUserService userService)
+{
+    _userService = userService;
+}
+
+Controller içerisindeki örnek service çağrısı:
+
+return Ok(await _userService.GetByIdAsync(id));
+
+Controller yalnızca service'i çağırır. Kullanıcıyı veritabanında arama
+işlemini kendisi yapmaz.
+
+
+4. CONTROLLER NEDEN TEMİZ TUTULDU?
+----------------------------------
+
+UserController içerisinden aşağıdaki işlemler çıkarıldı:
+
+- Bellekte tutulan kullanıcı listesi
+- FirstOrDefault ile kullanıcı arama kodları
+- AppDbContext kullanımı
+- Hata mesajları
+- Kullanıcı oluşturma iş mantığı
+- Güncelleme ve silme iş mantığı
+
+Controller içerisinde yalnızca HTTP ile ilgili kodlar ve service çağrıları
+kaldı.
+
+Tekil kullanıcı getirme örneği:
+
+public async Task<ActionResult<UserDto>> GetById(Guid id)
+{
+    return Ok(await _userService.GetByIdAsync(id));
+}
+
+Silme örneği:
+
+public async Task<IActionResult> Delete(Guid id)
+{
+    await _userService.DeleteAsync(id);
+    return NoContent();
+}
+
+"Controller boş olacak" ifadesi, controller'ın tamamen kodsuz olması
+değildir. Controller'ın iş mantığı ve veritabanı kodu içermemesi demektir.
+
+
+5. SERVICE KATMANI VE İŞ KURALLARI
+----------------------------------
+
+UserService asıl kullanıcı işlemlerini ve iş kurallarını yürütür.
+
+Projede bulunan bazı iş kuralları:
+
+- Kullanıcı ID'si API tarafından Guid.NewGuid() ile oluşturulur.
+- Aynı email adresiyle ikinci kullanıcı oluşturulamaz.
+- Update işleminde yalnızca Name değiştirilebilir.
+- ID ve Email update ile değiştirilemez.
+- Olmayan kullanıcı getirilemez, güncellenemez veya silinemez.
+- Name ve Email üzerindeki gereksiz boşluklar temizlenir.
+- Email küçük harfe dönüştürülerek saklanır.
+
+Aynı email kontrolü:
+
+bool emailExists = await _context.Users
+    .AnyAsync(user => user.Email == normalizedEmail);
+
+if (emailExists)
+{
+    throw new ConflictException(
+        $"{normalizedEmail} email adresi zaten kullanılıyor."
+    );
+}
+
+Yalnızca Name güncelleme:
+
+user.Name = model.Name.Trim();
+
+user.Id veya user.Email için atama yapılmadığından bu alanlar değişmez.
+
+
+6. HATA MESAJI VE HATAYI YAKALAMA ARASINDAKİ FARK
+--------------------------------------------------
+
+Service hatayı tespit eder, hata türünü ve mesajını oluşturur:
+
+if (user is null)
+{
+    throw new NotFoundException(
+        $"ID'si {id} olan kullanıcı bulunamadı."
+    );
+}
+
+Burada:
+
+- throw hatayı fırlatır.
+- NotFoundException hatanın türüdür.
+- "ID'si ... olan kullanıcı bulunamadı." hata mesajıdır.
+
+GlobalExceptionHandler fırlatılan hatayı yakalar ve HTTP cevabına çevirir:
+
+- NotFoundException -> 404 Not Found
+- ConflictException -> 409 Conflict
+- Beklenmeyen hata -> 500 Internal Server Error
+
+Oluşan JSON cevabı örneği:
+
+{
+  "message": "ID'si ... olan kullanıcı bulunamadı."
+}
+
+Hocaya kısa cevap:
+
+"Service hatayı tespit edip fırlatır. GlobalExceptionHandler hatayı
+yakalayıp uygun HTTP durum kodu ve JSON hata cevabına çevirir."
+
+
+7. MODEL BINDING NEDİR?
+-----------------------
+
+Swagger veya Postman üzerinden gönderilen JSON örneği:
+
+{
+  "name": "Kaan",
+  "email": "kaan@example.com"
+}
+
+Controller'daki parametre:
+
+Create([FromBody] UserCreateModel model)
+
+ASP.NET gelen JSON verisini okuyup UserCreateModel nesnesine dönüştürür.
+Bu işleme model binding denir.
+
+Dönüşümden sonra verilere şu şekilde erişilir:
+
+model.Name
+model.Email
+
+
+8. DATABASE'E GİTMEDEN MODEL VALIDATION
+---------------------------------------
+
+UserCreateModel içerisinde Data Annotation kuralları bulunur:
+
+[Required(ErrorMessage = "Name alanı zorunludur.")]
+[StringLength(
+    100,
+    MinimumLength = 2,
+    ErrorMessage = "Name 2 ile 100 karakter arasında olmalıdır."
+)]
+public string Name { get; set; } = string.Empty;
+
+[Required(ErrorMessage = "Email alanı zorunludur.")]
+[EmailAddress(ErrorMessage = "Geçerli bir email adresi girilmelidir.")]
+[StringLength(254)]
+public string Email { get; set; } = string.Empty;
+
+Kuralların anlamları:
+
+- Required: Alan zorunludur.
+- StringLength: Karakter sınırını kontrol eder.
+- EmailAddress: Email biçimini kontrol eder.
+
+Controller'da [ApiController] bulunduğu için ASP.NET model validation
+işlemini otomatik yapar.
+
+Geçersiz body örneği:
+
+{
+  "name": "K"
+}
+
+Bu istekte Name iki karakterden kısa ve Email eksiktir. Sonuç:
+
+- 400 Bad Request döner.
+- Controller metodu çalışmaz.
+- Service çağrılmaz.
+- PostgreSQL'e sorgu gönderilmez.
+
+Bu nedenle controller'a elle ModelState.IsValid kontrolü yazılması
+gerekmez.
+
+Hocaya kısa cevap:
+
+"Data Annotation ile yapılan model validation, controller ve service
+çalışmadan önce gerçekleşir. Geçersiz istek 400 döner ve database'e
+gitmez."
+
+
+9. VALIDATION TÜRLERİ
+---------------------
+
+Projede üç seviyede validation vardır:
+
+A) Request model validation
+
+Gelen body'nin biçimini kontrol eder:
+
+- Name gönderildi mi?
+- Name en az 2, en fazla 100 karakter mi?
+- Email gönderildi mi?
+- Email biçimi geçerli mi?
+
+Geçmezse 400 Bad Request döner ve database'e gidilmez.
+
+B) Service iş kuralı validation
+
+Biçim olarak doğru olan verinin uygulama kurallarına uygunluğunu kontrol
+eder:
+
+- Email daha önce kullanılmış mı?
+- Güncellemede yalnızca Name mi değişiyor?
+- Güncellenecek veya silinecek kullanıcı var mı?
+
+Örneğin email doğru biçimde olsa bile daha önce kullanılmışsa
+409 Conflict döner.
+
+C) Database validation
+
+Son güvenlik katmanıdır. PostgreSQL tablosundaki verinin bütünlüğünü
+korur:
+
+- Name boş olamaz.
+- Name 100 karakteri geçemez.
+- Email boş olamaz.
+- Email 254 karakteri geçemez.
+- Aynı email iki kere kaydedilemez.
+
+
+10. APPDBCONTEXT NEDİR?
+-----------------------
+
+AppDbContext, Entity Framework Core ile PostgreSQL arasındaki köprüdür.
+
+Tanımı:
+
+public class AppDbContext : DbContext
+
+İçerisindeki:
+
+public DbSet<User> Users => Set<User>();
+
+ifadesi PostgreSQL'deki Users tablosunun C# tarafındaki karşılığıdır.
+
+UserService içerisine constructor ile aktarılır:
+
+private readonly AppDbContext _context;
+
+public UserService(AppDbContext context)
+{
+    _context = context;
+}
+
+Service içerisinde:
+
+_context.Users
+
+yazıldığında PostgreSQL'deki Users tablosu üzerinde işlem yapılır.
+
+Hocaya kısa cevap:
+
+"AppDbContext Entity Framework'ün PostgreSQL bağlantısını ve tabloları
+yönettiği sınıftır. DbSet User ise Users tablosunun C# karşılığıdır."
+
+
+11. FIRSTORDEFAULTASYNC NEDİR?
+------------------------------
+
+Kullanıcıyı ID ile arayan kod:
+
+User? user = await _context.Users
+    .FirstOrDefaultAsync(user => user.Id == id);
+
+Anlamı:
+
+"ID değeri verilen ID'ye eşit olan ilk kullanıcıyı getir. Bulamazsan null
+döndür."
+
+Entity Framework bunu yaklaşık olarak aşağıdaki SQL sorgusuna çevirir:
+
+SELECT *
+FROM "Users"
+WHERE "Id" = ...
+LIMIT 1;
+
+FirstOrDefaultAsync ile FirstAsync farkı:
+
+- FirstOrDefaultAsync bulamazsa null döndürür.
+- FirstAsync bulamazsa doğrudan exception fırlatır.
+
+Projede kendi hata mesajımızı oluşturabilmek için FirstOrDefaultAsync
+kullanılır.
+
+
+12. ASNOTRACKING NEDİR?
+-----------------------
+
+Sadece veri okunan sorgularda kullanılır:
+
+_context.Users
+    .AsNoTracking()
+    .FirstOrDefaultAsync(...);
+
+Entity Framework normalde getirdiği nesnelerde yapılan değişiklikleri takip
+eder. AsNoTracking kullanıldığında değişiklik takibi yapılmaz.
+
+Getirme ve listeleme işlemlerinde veriyi değiştirmediğimiz için
+AsNoTracking kullanmak daha az kaynak tüketir.
+
+Update ve Delete işlemlerinde nesne değiştirileceği için AsNoTracking
+kullanılmaz.
+
+
+13. SAVECHANGESASYNC NEDEN GEREKLİ?
+-----------------------------------
+
+Yeni kullanıcı ekleme:
+
+_context.Users.Add(user);
+
+Add metodu kullanıcıyı hemen PostgreSQL'e kaydetmez. Entity Framework'e
+bu kullanıcının ekleneceğini bildirir.
+
+Gerçek kayıt:
+
+await _context.SaveChangesAsync();
+
+çalışınca PostgreSQL'e gönderilir.
+
+Güncelleme:
+
+user.Name = model.Name.Trim();
+await _context.SaveChangesAsync();
+
+Entity Framework değişen Name alanını takip eder. SaveChangesAsync
+çalıştığında yaklaşık olarak UPDATE sorgusu gönderilir.
+
+Silme:
+
+_context.Users.Remove(user);
+await _context.SaveChangesAsync();
+
+Remove kullanıcıyı silinecek olarak işaretler. SaveChangesAsync gerçek
+DELETE sorgusunu PostgreSQL'e gönderir.
+
+Özet:
+
+- Add: Eklenecek olarak işaretler.
+- Property değiştirmek: Güncellenecek değer takip edilir.
+- Remove: Silinecek olarak işaretler.
+- SaveChangesAsync: Değişiklikleri PostgreSQL'e uygular.
+
+
+14. NEDEN BÜTÜN DATABASE METOTLARI ASYNC?
+-----------------------------------------
+
+Örnek metot:
+
+public async Task<UserDto> GetByIdAsync(Guid id)
+
+İçindeki kullanım:
+
+await _context.Users.FirstOrDefaultAsync(...);
+
+Kavramların anlamları:
+
+- async: Metodun asenkron çalışabileceğini belirtir.
+- Task<UserDto>: İşlem tamamlandığında UserDto döndürüleceğini belirtir.
+- await: PostgreSQL cevabını thread'i bloke etmeden bekler.
+
+Database işlemleri I/O işlemidir. API, PostgreSQL'den cevap beklerken
+thread'i boş yere kilitlememek için async metotlar kullanılır.
+
+Asenkron kullanım tek bir sorguyu mutlaka daha hızlı yapmaz. Aynı anda çok
+sayıda istek geldiğinde API'nin bekleme süresinde başka isteklerle
+ilgilenebilmesini sağlar.
+
+Kullanılan EF Core async metotları:
+
+- ToListAsync
+- FirstOrDefaultAsync
+- AnyAsync
+- SaveChangesAsync
+
+Hocaya kısa cevap:
+
+"Database işlemleri I/O işlemidir. PostgreSQL cevabını beklerken thread'i
+bloke etmemek ve API'nin aynı anda daha fazla istek karşılayabilmesi için
+Entity Framework'ün async metotlarını kullanıyorum."
+
+
+15. ENTITY FRAMEWORK CORE NEDİR?
+--------------------------------
+
+Entity Framework Core, C# nesneleriyle ilişkisel veritabanı arasında
+çalışan ORM aracıdır.
+
+ORM, Object Relational Mapper anlamına gelir.
+
+Entity Framework sayesinde çoğu SQL sorgusunu elle yazmak yerine C# ile
+yazabiliriz.
+
+C#:
+
+await _context.Users.ToListAsync();
+
+Yaklaşık SQL karşılığı:
+
+SELECT * FROM "Users";
+
+C#:
+
+_context.Users.Add(user);
+await _context.SaveChangesAsync();
+
+Yaklaşık SQL karşılığı:
+
+INSERT INTO "Users" ...;
+
+
+16. POSTGRESQL TARAFINDA YAPILANLAR
+-----------------------------------
+
+- Docker'daki staj-postgres-1 container'ı kullanıldı.
+- StajApiDb veritabanı kullanıldı.
+- Entity Framework Core ve Npgsql projeye eklendi.
+- AppDbContext ile PostgreSQL bağlantısı kuruldu.
+- Users tablosu oluşturuldu.
+- Id alanı PostgreSQL'de uuid olarak oluşturuldu.
+- Name zorunlu ve en fazla 100 karakter yapıldı.
+- Email zorunlu ve en fazla 254 karakter yapıldı.
+- Email alanına unique index eklendi.
+- Fatih ve Rüstem başlangıç verisi olarak eklendi.
+- GET, POST, PUT ve DELETE işlemleri PostgreSQL üzerinde çalıştırıldı.
+
+Users tablosunun yapısı:
+
+StajApiDb
+    -> Users
+        -> Id
+        -> Name
+        -> Email
+
+
+17. MIGRATION NEDİR?
+--------------------
+
+Migration, C# tarafındaki entity ve AppDbContext kurallarını PostgreSQL
+tablo yapısına dönüştüren değişiklik dosyasıdır.
+
+Migration listesini görmek:
+
+dotnet tool run dotnet-ef migrations list
+
+Migration'ı PostgreSQL'e uygulamak:
+
+dotnet tool run dotnet-ef database update
+
+Hocaya kısa cevap:
+
+"Migration C# modelinde tanımlanan tablo ve kolon kurallarını PostgreSQL
+veritabanına uygular."
+
+
+18. POSTGRESQL TEMEL KOMUTLARI
+------------------------------
+
+Docker container'ını başlatma:
+
+docker start staj-postgres-1
+
+PostgreSQL terminaline girme:
+
+docker exec -it staj-postgres-1 psql -U postgres -d StajApiDb
+
+Tabloları listeleme:
+
+\dt
+
+Users tablosunun yapısını görme:
+
+\d "Users"
+
+Kullanıcıları listeleme:
+
+SELECT * FROM "Users";
+
+Kullanıcı ekleme:
+
+INSERT INTO "Users" ("Id", "Name", "Email")
+VALUES (gen_random_uuid(), 'Ayşe', 'ayse@example.com');
+
+Kullanıcı adını değiştirme:
+
+UPDATE "Users"
+SET "Name" = 'Ayşe Güncel'
+WHERE "Email" = 'ayse@example.com';
+
+Kullanıcı silme:
+
+DELETE FROM "Users"
+WHERE "Email" = 'ayse@example.com';
+
+PostgreSQL terminalinden çıkma:
+
+\q
+
+Docker'daki çöp kutusu container'ı siler. SQL DELETE ise yalnızca
+Users tablosundaki seçilen kullanıcı kaydını siler.
+
+Normal kullanımda kayıt işlemlerini Swagger üzerinden yapmak daha
+doğrudur. SQL ile doğrudan işlem yapılırsa service iş kuralları atlanır.
+
+
+19. DATABASE BAĞLANTI BİLGİSİ
+------------------------------
+
+Database bağlantısı appsettings.json içerisindeki DefaultConnection
+alanından okunur.
+
+Bağlantı bilgisinde şunlar bulunur:
+
+- Host: PostgreSQL'in çalıştığı adres
+- Port: PostgreSQL portu
+- Database: Veritabanı adı
+- Username: PostgreSQL kullanıcı adı
+- Password: PostgreSQL bağlantı şifresi
+
+Program.cs içerisindeki:
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    ));
+
+kodu appsettings.json içerisindeki DefaultConnection değerini okuyarak
+AppDbContext'i PostgreSQL'e bağlar.
+
+
+20. PROJE KLASÖR YAPISI
+-----------------------
+
+Controllers/
+    UserController.cs
+
+Services/
+    UserService.cs
+    Interfaces/
+        IUserService.cs
+
+Models/
+    Entities/
+        User.cs
+    Requests/
+        UserCreateModel.cs
+        UserUpdateModel.cs
+    Responses/
+        UserDto.cs
+        UserActionResponse.cs
+
+Data/
+    AppDbContext.cs
+    AppDbContextFactory.cs
+
+Exceptions/
+    NotFoundException.cs
+    ConflictException.cs
+
+ExceptionHandling/
+    GlobalExceptionHandler.cs
+
+Migrations/
+    InitialCreate...
+
+Klasörlerin görevleri:
+
+- Controllers: HTTP isteklerini karşılar.
+- Services: İş kurallarını ve database işlemlerini yürütür.
+- Interfaces: Service sözleşmelerini tutar.
+- Entities: PostgreSQL tablolarını temsil eder.
+- Requests: API'ye gelen request body modelleridir.
+- Responses: API'nin istemciye döndürdüğü veri modelleridir.
+- Data: Entity Framework ve tablo yapılandırmasıdır.
+- Exceptions: Özel hata türleridir.
+- ExceptionHandling: Hataları HTTP cevaplarına çevirir.
+- Migrations: Veritabanı yapısının değişiklik geçmişidir.
+
+
+21. ENDPOINT ÖZETİ
+------------------
+
+GET /api/User
+
+Tüm kullanıcıları PostgreSQL'den getirir.
+
+GET /api/User/{id}
+
+Guid ID değerine sahip tek kullanıcıyı getirir. Kullanıcı yoksa 404
+döner.
+
+POST /api/User
+
+Name ve Email alır. ID'yi Guid.NewGuid() ile API üretir. Başarılıysa
+201 Created döner. Aynı email kullanılmışsa 409 Conflict döner.
+
+PUT /api/User/{id}
+
+Yalnızca Name alanını değiştirir. ID ve Email değişmez. Kullanıcı yoksa
+404 döner.
+
+DELETE /api/User/{id}
+
+Guid ID ile kullanıcıyı siler. Başarılıysa 204 No Content, kullanıcı
+yoksa 404 döner.
+
+
+22. HOCAYA GENEL KISA ÖZET
+--------------------------
+
+"Controller'ı sadeleştirip kullanıcı arama ve CRUD işlemlerini
+IUserService üzerinden UserService'e taşıdım. IUserService service
+katmanının sözleşmesini belirliyor. UserService iş kurallarını ve Entity
+Framework üzerinden PostgreSQL işlemlerini yürütüyor. Hata mesajları
+service içinde oluşturuluyor ve GlobalExceptionHandler tarafından HTTP
+cevaplarına çevriliyor. Request modellerine Data Annotation, AppDbContext
+içine database kısıtları ekledim. Entity, request, response, interface,
+service ve exception dosyalarını ayrı klasörlerde düzenledim. Database
+işlemleri I/O olduğu için Entity Framework'ün async metotlarını
+kullanıyorum."
