@@ -24,4 +24,12 @@ public class UserCreateModel
     [EmailAddress(ErrorMessage = "Geçerli bir email adresi girilmelidir.")]
     [StringLength(254, ErrorMessage = "Email en fazla 254 karakter olabilir.")]
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Yeni kullanıcının şifresidir. Boş bırakılamaz.
+    /// </summary>
+    /// <example>Password123!</example>
+    [Required(ErrorMessage = "Password alanı zorunludur.")]
+    [StringLength(100, MinimumLength = 6, ErrorMessage = "Password en az 6, en fazla 100 karakter olmalıdır.")]
+    public string Password { get; set; } = string.Empty;
 }
