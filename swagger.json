@@ -1,0 +1,627 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "Staj API",
+    "description": "Stajyer kayıtlarını listelemek, eklemek, güncellemek ve silmek için hazırlanmış Web API projesidir.",
+    "contact": {
+      "name": "Kaan Kesen",
+      "url": "https://github.com/kaanksn1"
+    },
+    "version": "v1"
+  },
+  "paths": {
+    "/api/Stajyerler": {
+      "get": {
+        "tags": [
+          "Stajyerler"
+        ],
+        "summary": "Tüm stajyer kayıtlarını getirir.",
+        "responses": {
+          "200": {
+            "description": "Stajyer listesi başarıyla getirildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Stajyer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Stajyerler"
+        ],
+        "summary": "Yeni bir stajyer kaydı oluşturur.",
+        "requestBody": {
+          "description": "Request body içerisinden alınan yeni stajyer bilgileridir.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StajyerRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StajyerRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StajyerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stajyer başarıyla oluşturuldu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stajyer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Stajyerler/{id}": {
+      "get": {
+        "tags": [
+          "Stajyerler"
+        ],
+        "summary": "Belirtilen ID'ye sahip stajyer kaydını getirir.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Getirilecek stajyerin ID değeridir.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stajyer başarıyla bulundu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stajyer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Belirtilen ID'ye sahip stajyer bulunamadı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Stajyerler"
+        ],
+        "summary": "Belirtilen ID'ye sahip stajyer kaydını günceller.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Güncellenecek stajyerin URL'den alınan ID değeridir.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Request body içerisinden alınan güncel stajyer bilgileridir.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StajyerRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StajyerRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StajyerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stajyer başarıyla güncellendi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stajyer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Güncellenecek stajyer bulunamadı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Stajyerler"
+        ],
+        "summary": "Belirtilen ID'ye sahip stajyer kaydını siler.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Silinecek stajyerin ID değeridir.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Stajyer başarıyla silindi."
+          },
+          "404": {
+            "description": "Silinecek stajyer bulunamadı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/User": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Tüm kullanıcıları listeler.",
+        "responses": {
+          "200": {
+            "description": "Kullanıcı listesi başarıyla getirildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Name, Email ve Password bilgileriyle yeni kullanıcı oluşturur.",
+        "requestBody": {
+          "description": "Request body içerisinden alınan kullanıcı bilgileridir.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kullanıcı başarıyla oluşturuldu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Password alanı boş veya bilgiler geçersiz.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email adresi başka bir kullanıcı tarafından kullanılıyor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/User/{id}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Belirtilen ID değerine sahip kullanıcıyı getirir. Karakter sayısı ve GUID formatı kontrolü yapar.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Getirilecek kullanıcının ID değeridir.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kullanıcı başarıyla bulundu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ID formatı geçersiz (eksik veya fazladan karakter içeriyor).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Kullanıcı bulunamadı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Kullanıcının yalnızca Name alanını günceller.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Güncellenecek kullanıcının Guid ID değeridir.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Yalnızca yeni Name bilgisini içeren request body'dir.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateModel"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateModel"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateModel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kullanıcı başarıyla güncellendi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserActionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Kullanıcı bulunamadı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Belirtilen Guid ID değerine sahip kullanıcıyı siler.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Silinecek kullanıcının Guid ID değeridir.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Kullanıcı başarıyla silindi."
+          },
+          "404": {
+            "description": "Kullanıcı bulunamadı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Hatanın nedenini açıklayan mesajdır.",
+            "nullable": true,
+            "example": "ID'si 99 olan stajyer bulunamadı."
+          }
+        },
+        "additionalProperties": false,
+        "description": "API hata cevaplarını temsil eder."
+      },
+      "Stajyer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Stajyerin benzersiz kimlik numarasıdır.",
+            "format": "int32",
+            "example": 1
+          },
+          "ad": {
+            "type": "string",
+            "description": "Stajyerin adıdır.",
+            "nullable": true,
+            "example": "Ayşe"
+          },
+          "soyad": {
+            "type": "string",
+            "description": "Stajyerin soyadıdır.",
+            "nullable": true,
+            "example": "Demir"
+          },
+          "departman": {
+            "type": "string",
+            "description": "Stajyerin çalıştığı departmandır.",
+            "nullable": true,
+            "example": "Yazılım"
+          },
+          "baslangicTarihi": {
+            "type": "string",
+            "description": "Stajyerin işe başlangıç tarihidir.",
+            "format": "date",
+            "example": "2026-07-23"
+          },
+          "aktifMi": {
+            "type": "boolean",
+            "description": "Stajyerin aktif olarak çalışıp çalışmadığını belirtir.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Stajyer bilgilerini temsil eder."
+      },
+      "StajyerRequest": {
+        "type": "object",
+        "properties": {
+          "ad": {
+            "type": "string",
+            "description": "Stajyerin adıdır.",
+            "nullable": true,
+            "example": "Kaan"
+          },
+          "soyad": {
+            "type": "string",
+            "description": "Stajyerin soyadıdır.",
+            "nullable": true,
+            "example": "Kesen"
+          },
+          "departman": {
+            "type": "string",
+            "description": "Stajyerin çalışacağı departmandır.",
+            "nullable": true,
+            "example": "Yazılım"
+          },
+          "baslangicTarihi": {
+            "type": "string",
+            "description": "Stajyerin işe başlangıç tarihidir.",
+            "format": "date",
+            "example": "2026-07-21"
+          },
+          "aktifMi": {
+            "type": "boolean",
+            "description": "Stajyerin aktif olup olmadığını belirtir.",
+            "example": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Stajyer oluşturma ve güncelleme isteklerinde gönderilecek bilgileri temsil eder."
+      },
+      "UserActionResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Yapılan işlemin sonucunu açıklayan mesajdır.",
+            "nullable": true,
+            "example": "User \"11111111-1111-1111-1111-111111111111\" updated"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Kullanıcı işleminin sonucunu içeren mesaj cevabını temsil eder."
+      },
+      "UserCreateModel": {
+        "required": [
+          "email",
+          "name",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 2,
+            "type": "string",
+            "description": "Yeni kullanıcının adıdır.",
+            "example": "Fatih"
+          },
+          "email": {
+            "maxLength": 254,
+            "minLength": 0,
+            "type": "string",
+            "description": "Yeni kullanıcının email adresidir.",
+            "format": "email",
+            "example": "fatih.ulus@pointr.tech"
+          },
+          "password": {
+            "maxLength": 100,
+            "minLength": 6,
+            "type": "string",
+            "description": "Yeni kullanıcının şifresidir. Boş bırakılamaz.",
+            "example": "Password123!"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Yeni kullanıcı oluşturma isteğinin request body modelidir.\r\nID istemciden alınmaz; API tarafından otomatik üretilir."
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Kullanıcının benzersiz Guid kimlik değeridir.",
+            "format": "uuid",
+            "example": "11111111-1111-1111-1111-111111111111"
+          },
+          "name": {
+            "type": "string",
+            "description": "Kullanıcının adıdır.",
+            "nullable": true,
+            "example": "Fatih"
+          },
+          "email": {
+            "type": "string",
+            "description": "Kullanıcının email adresidir.",
+            "nullable": true,
+            "example": "fatih.ulus@pointr.tech"
+          }
+        },
+        "additionalProperties": false,
+        "description": "API'nin istemciye döndürdüğü kullanıcı verisini temsil eder."
+      },
+      "UserUpdateModel": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 2,
+            "type": "string",
+            "description": "Kullanıcının yeni adıdır.",
+            "example": "Fatih Ulus"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Kullanıcı güncelleme isteğinin request body modelidir.\r\nID ve Email değiştirilemez; bu nedenle yalnızca Name alanını içerir."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Stajyerler"
+    },
+    {
+      "name": "User"
+    }
+  ]
+}
