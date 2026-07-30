@@ -14,6 +14,14 @@ public class GlobalExceptionHandler : IExceptionHandler
     {
         (int statusCode, string message) = exception switch
         {
+            BadRequestException => (
+                StatusCodes.Status400BadRequest,
+                exception.Message
+            ),
+            UnauthorizedException => (
+                StatusCodes.Status401Unauthorized,
+                exception.Message
+            ),
             NotFoundException => (
                 StatusCodes.Status404NotFound,
                 exception.Message

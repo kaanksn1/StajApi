@@ -29,6 +29,7 @@ packages/
 *.log
 .env
 .env.*
+appsettings.Local.json
 
 ## Operating system files
 .DS_Store

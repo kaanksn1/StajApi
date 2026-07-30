@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StajApi.Data;
 using StajApi.Exceptions;
@@ -15,14 +16,19 @@ namespace StajApi.Services;
 public class UserService : IUserService
 {
     private readonly AppDbContext _context;
+    private readonly IPasswordHasher<User> _passwordHasher;
 
     /// <summary>
     /// Dependency Injection: AppDbContext dışarıdan buraya enjekte edilir.
     /// Böylece veritabanı ile konuşabiliriz.
     /// </summary>
-    public UserService(AppDbContext context)
+    public UserService(
+        AppDbContext context,
+        IPasswordHasher<User> passwordHasher
+    )
     {
         _context = context;
+        _passwordHasher = passwordHasher;
     }
 
     /// <summary>
@@ -44,15 +50,22 @@ public class UserService : IUserService
     /// <summary>
     /// ID'ye göre veritabanında arama yapar, bulursa kullanıcıyı döner.
     /// </summary>
-    public async Task<UserDto> GetByIdAsync(Guid id)
+    public async Task<UserDto> GetByIdAsync(string id)
     {
+        if (!Guid.TryParse(id, out Guid parsedId))
+        {
+            throw new BadRequestException(
+                $"Girdiğiniz ID değeri ('{id}') geçerli bir GUID formatında değildir."
+            );
+        }
+
         User? user = await _context.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(user => user.Id == id);
+            .FirstOrDefaultAsync(user => user.Id == parsedId);
 
         if (user is null)
         {
-            throw new NotFoundException($"ID'si {id} olan kullanıcı bulunamadı.");
+            throw new NotFoundException($"ID'si {parsedId} olan kullanıcı bulunamadı.");
         }
 
         return ToDto(user);
@@ -77,8 +90,11 @@ public class UserService : IUserService
         {
             Id = Guid.NewGuid(),
             Name = model.Name.Trim(),
-            Email = normalizedEmail
+            Email = normalizedEmail,
+            UserType = "User"
         };
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, model.Password);
 
         _context.Users.Add(user);
 

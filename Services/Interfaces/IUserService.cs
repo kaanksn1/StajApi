@@ -18,7 +18,7 @@ public interface IUserService
     /// <summary>
     /// Belirtilen ID'ye sahip tek bir kullanıcıyı getirir.
     /// </summary>
-    Task<UserDto> GetByIdAsync(Guid id);
+    Task<UserDto> GetByIdAsync(string id);
 
     /// <summary>
     /// Yeni bir kullanıcı oluşturur ve veritabanına kaydeder.

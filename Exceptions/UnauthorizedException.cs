@@ -1,0 +1,8 @@
+namespace StajApi.Exceptions;
+
+public class UnauthorizedException : Exception
+{
+    public UnauthorizedException(string message) : base(message)
+    {
+    }
+}

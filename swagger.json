@@ -10,6 +10,95 @@
     "version": "v1"
   },
   "paths": {
+    "/api/Auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Email ve şifre doğruysa JWT token üretir.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JWT başarıyla üretildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request validation başarısız.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email veya şifre hatalı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/validate": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Authorization header ile gelen JWT'yi doğrular ve geçerliyse claimleri döndürür.",
+        "responses": {
+          "200": {
+            "description": "Token geçerli; kullanıcı ve claim bilgileri döndürüldü.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenValidationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik, süresi geçmiş veya geçersiz.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Stajyerler": {
       "get": {
         "tags": [
@@ -447,6 +536,74 @@
         "additionalProperties": false,
         "description": "API hata cevaplarını temsil eder."
       },
+      "LoginRequest": {
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "format": "email",
+            "example": "kaan.kesen@pointr.tech"
+          },
+          "password": {
+            "minLength": 1,
+            "type": "string",
+            "example": "Password123!"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Kullanıcının email ve şifreyle giriş yapması için gönderilen request body'dir."
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "nullable": true
+          },
+          "tokenType": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Başarılı login işlemi sonucunda istemciye verilen JWT bilgisidir."
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": { }
+      },
       "Stajyer": {
         "type": "object",
         "properties": {
@@ -525,6 +682,54 @@
         "additionalProperties": false,
         "description": "Stajyer oluşturma ve güncelleme isteklerinde gönderilecek bilgileri temsil eder."
       },
+      "TokenClaimDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "JWT içerisinden okunan tek bir claim bilgisini temsil eder."
+      },
+      "TokenValidationResponse": {
+        "type": "object",
+        "properties": {
+          "isValid": {
+            "type": "boolean"
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "userType": {
+            "type": "string",
+            "nullable": true
+          },
+          "claims": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TokenClaimDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "JWT geçerliyse token içerisindeki kullanıcı ve claim bilgilerini döndürür."
+      },
       "UserActionResponse": {
         "type": "object",
         "properties": {
@@ -570,7 +775,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Yeni kullanıcı oluşturma isteğinin request body modelidir.\r\nID istemciden alınmaz; API tarafından otomatik üretilir."
+        "description": "Yeni kullanıcı oluşturma isteğinin request body modelidir.\nID istemciden alınmaz; API tarafından otomatik üretilir."
       },
       "UserDto": {
         "type": "object",
@@ -612,11 +817,27 @@
           }
         },
         "additionalProperties": false,
-        "description": "Kullanıcı güncelleme isteğinin request body modelidir.\r\nID ve Email değiştirilemez; bu nedenle yalnızca Name alanını içerir."
+        "description": "Kullanıcı güncelleme isteğinin request body modelidir.\nID ve Email değiştirilemez; bu nedenle yalnızca Name alanını içerir."
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Login endpointinden alınan JWT tokenini girin.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     }
   },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ],
   "tags": [
+    {
+      "name": "Auth"
+    },
     {
       "name": "Stajyerler"
     },

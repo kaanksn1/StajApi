@@ -1,17 +1,71 @@
 using Microsoft.OpenApi;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using StajApi.Data;
 using StajApi.Services;
 using StajApi.ExceptionHandling;
+using StajApi.Models.Configuration;
+using StajApi.Models.Entities;
 using StajApi.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.AddJsonFile(
+    "appsettings.Local.json",
+    optional: true,
+    reloadOnChange: true
+);
 
 builder.Services.AddControllers();
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+builder.Services
+    .AddOptions<JwtSettings>()
+    .Bind(builder.Configuration.GetSection(JwtSettings.SectionName))
+    .Validate(settings => !string.IsNullOrWhiteSpace(settings.Key),
+        "Jwt:Key boş olamaz.")
+    .Validate(settings => settings.Key.Length >= 32,
+        "Jwt:Key en az 32 karakter olmalıdır.")
+    .Validate(settings => !string.IsNullOrWhiteSpace(settings.Issuer),
+        "Jwt:Issuer boş olamaz.")
+    .Validate(settings => !string.IsNullOrWhiteSpace(settings.Audience),
+        "Jwt:Audience boş olamaz.")
+    .ValidateOnStart();
+
+JwtSettings jwtSettings = builder.Configuration
+    .GetRequiredSection(JwtSettings.SectionName)
+    .Get<JwtSettings>()
+    ?? throw new InvalidOperationException("JWT ayarları bulunamadı.");
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtSettings.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSettings.Key)
+            ),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
+            NameClaimType = "name",
+            RoleClaimType = "role"
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 // PostgreSQL Veritabanı Bağlantısı (DbContext)
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -19,6 +73,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Service ve Interface Kaydı
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -37,6 +93,19 @@ builder.Services.AddSwaggerGen(options =>
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     options.IncludeXmlComments(xmlPath);
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "Login endpointinden alınan JWT tokenini girin."
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
 });
 
 var app = builder.Build();
@@ -56,6 +125,8 @@ if (app.Environment.IsDevelopment()) // gereksiz bilgileri dışarıya açmamak 
 app.UseHttpsRedirection();
 
 app.UseExceptionHandler();
+
+app.UseAuthentication();
 
 app.UseAuthorization();
 

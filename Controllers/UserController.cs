@@ -42,40 +42,10 @@ public class UserController : ControllerBase
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(string id)
+    public async Task<ActionResult<UserDto>> GetById(string id)
     {
-        // 1. KONTROL: Karakter dizisi geçerli bir GUID formatına uyuyor mu?
-        if (!Guid.TryParse(id, out Guid parsedGuid))
-        {
-            return BadRequest(new ErrorResponse 
-            { 
-                Message = $"Girdiğiniz ID değeri ('{id}') geçerli bir GUID formatında değildir. Eksik veya fazladan karakter girmiş olabilirsiniz (Girilen Karakter Sayısı: {id?.Length ?? 0})." 
-            });
-        }
-
-        // 2. KONTROL: Service tarafındaki olası Hata (Exception) durumlarına karşı try-catch
-        try
-        {
-            var user = await _userService.GetByIdAsync(parsedGuid);
-
-            if (user == null)
-            {
-                return NotFound(new ErrorResponse 
-                { 
-                    Message = $"Girdiğiniz ID ('{parsedGuid}') geçerli bir formatadır ancak bu ID ile eşleşen bir kullanıcı veritabanında bulunamadı." 
-                });
-            }
-
-            return Ok(user);
-        }
-        catch (Exception)
-        {
-            // Eğer Service katmanı kullanıcıyı bulamadığında 500 hatası (Exception) fırlatıyorsa yakalayıp 404 dönüyoruz:
-            return NotFound(new ErrorResponse 
-            { 
-                Message = $"Girdiğiniz ID ('{parsedGuid}') geçerli bir formatadır ancak bu ID ile eşleşen bir kullanıcı veritabanında bulunamadı." 
-            });
-        }
+        UserDto user = await _userService.GetByIdAsync(id);
+        return Ok(user);
     }
 
     /// <summary>
@@ -90,34 +60,15 @@ public class UserController : ControllerBase
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult> Create([FromBody] UserCreateModel model)
+    public async Task<ActionResult<UserDto>> Create([FromBody] UserCreateModel model)
     {
-        // Password alanı boş gönderildiyse servise gitmeden 400 Bad Request fırlatıyoruz
-        if (model == null || string.IsNullOrWhiteSpace(model.Password))
-        {
-            return BadRequest(new ErrorResponse
-            {
-                Message = "Password alanı zorunludur ve boş bırakılamaz."
-            });
-        }
+        UserDto newUser = await _userService.CreateAsync(model);
 
-        try
-        {
-            UserDto newUser = await _userService.CreateAsync(model);
-
-            return CreatedAtAction(
-                nameof(GetById),
-                new { id = newUser.Id },
-                newUser
-            );
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new ErrorResponse
-            {
-                Message = $"Kullanıcı oluşturulurken bir hata oluştu: {ex.Message}"
-            });
-        }
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = newUser.Id },
+            newUser
+        );
     }
 
     /// <summary>
