@@ -3,11 +3,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using StajApi.Data;
 using StajApi.Services;
 using StajApi.ExceptionHandling;
+using StajApi.Models;
 using StajApi.Models.Configuration;
 using StajApi.Models.Entities;
 using StajApi.Services.Interfaces;
@@ -20,7 +22,36 @@ builder.Configuration.AddJsonFile(
     reloadOnChange: true
 );
 
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            bool hasJsonError = context.ModelState.Keys.Any(
+                key => key == "$" || key.StartsWith("$.")
+            );
+
+            string message;
+
+            if (hasJsonError)
+            {
+                message = "JSON formatı geçersiz. Virgül, tırnak ve parantezleri kontrol edin.";
+            }
+            else
+            {
+                message = context.ModelState.Values
+                    .SelectMany(value => value.Errors)
+                    .Select(error => error.ErrorMessage)
+                    .FirstOrDefault(error => !string.IsNullOrWhiteSpace(error))
+                    ?? "Gönderilen bilgiler geçersiz.";
+            }
+
+            return new BadRequestObjectResult(
+                new ErrorResponse { Message = message }
+            );
+        };
+    });
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
