@@ -11,9 +11,9 @@ namespace StajApi.Services.Interfaces;
 public interface IUserService
 {
     /// <summary>
-    /// Veritabanındaki tüm kullanıcıları getirir.
+    /// Kullanıcıları arama ve sayfalama seçeneklerine göre getirir.
     /// </summary>
-    Task<List<UserDto>> GetAllAsync();
+    Task<PagedResponse<UserDto>> GetAllAsync(UserListQuery query);
 
     /// <summary>
     /// Belirtilen ID'ye sahip tek bir kullanıcıyı getirir.

@@ -300,17 +300,57 @@
         "tags": [
           "User"
         ],
-        "summary": "Tüm kullanıcıları listeler.",
+        "summary": "Kullanıcıları arama ve sayfalama seçeneklerine göre listeler.",
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "description": "Getirilecek sayfa numarasıdır.",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "description": "Bir sayfada bulunabilecek en fazla kullanıcı sayısıdır.",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Search",
+            "in": "query",
+            "description": "Kullanıcı adı veya email adresinde aranacak isteğe bağlı metindir.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Kullanıcı listesi başarıyla getirildi.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/UserDto"
-                  }
+                  "$ref": "#/components/schemas/UserDtoPagedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Query parametreleri geçersiz.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -801,6 +841,51 @@
         },
         "additionalProperties": false,
         "description": "API'nin istemciye döndürdüğü kullanıcı verisini temsil eder."
+      },
+      "UserDtoPagedResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserDto"
+            },
+            "description": "İstenen sayfadaki kayıtları içerir.",
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "description": "Şu an getirilen sayfanın numarasıdır.",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Bir sayfada bulunabilecek kayıt sayısıdır.",
+            "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "Filtreye uyan toplam kayıt sayısıdır.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Toplam sayfa sayısıdır.",
+            "format": "int32"
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Önceki bir sayfanın bulunup bulunmadığını gösterir.",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Sonraki bir sayfanın bulunup bulunmadığını gösterir.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Sayfalama uygulanan liste sonuçlarının ortak response modelidir."
       },
       "UserUpdateModel": {
         "required": [

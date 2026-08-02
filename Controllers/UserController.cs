@@ -19,15 +19,29 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
-    /// Tüm kullanıcıları listeler.
+    /// Kullanıcıları arama ve sayfalama seçeneklerine göre listeler.
     /// </summary>
-    /// <returns>Kullanıcı listesini döndürür.</returns>
+    /// <param name="query">Sayfa numarası, sayfa büyüklüğü ve arama metnidir.</param>
+    /// <returns>Sayfalama bilgileriyle birlikte kullanıcı listesini döndürür.</returns>
     /// <response code="200">Kullanıcı listesi başarıyla getirildi.</response>
+    /// <response code="400">Query parametreleri geçersiz.</response>
     [HttpGet]
-    [ProducesResponseType(typeof(List<UserDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<UserDto>>> GetAll()
+    [ProducesResponseType(
+        typeof(PagedResponse<UserDto>),
+        StatusCodes.Status200OK
+    )]
+    [ProducesResponseType(
+        typeof(ErrorResponse),
+        StatusCodes.Status400BadRequest
+    )]
+    public async Task<ActionResult<PagedResponse<UserDto>>> GetAll(
+        [FromQuery] UserListQuery query
+    )
     {
-        return Ok(await _userService.GetAllAsync());
+        PagedResponse<UserDto> response =
+            await _userService.GetAllAsync(query);
+
+        return Ok(response);
     }
 
     /// <summary>

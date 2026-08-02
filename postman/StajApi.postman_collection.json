@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "5c23c4fb-f49c-4bd1-832d-5ea205aad975",
     "name": "StajApi - User ve JWT İşlemleri",
-    "description": "User CRUD, geçersiz GUID, login ve JWT doğrulama için hazır istekler.",
+    "description": "User CRUD, pagination, arama, validation, login ve JWT doğrulama için hazır istekler.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -41,6 +41,147 @@
           "path": [
             "api",
             "User"
+          ]
+        }
+      }
+    },
+    {
+      "name": "1A - User Pagination (GET)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code 200 olmalı', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Sayfa bilgileri doğru olmalı', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response.page).to.eql(1);",
+              "    pm.expect(response.pageSize).to.eql(2);",
+              "    pm.expect(response.items.length).to.be.at.most(2);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/User?Page=1&PageSize=2",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "User"
+          ],
+          "query": [
+            {
+              "key": "Page",
+              "value": "1"
+            },
+            {
+              "key": "PageSize",
+              "value": "2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "1B - User Search (GET)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code 200 olmalı', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Sonuçlar Kaan aramasıyla eşleşmeli', function () {",
+              "    const response = pm.response.json();",
+              "    response.items.forEach(function (user) {",
+              "        const text = `${user.name} ${user.email}`.toLowerCase();",
+              "        pm.expect(text).to.include('kaan');",
+              "    });",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/User?Page=1&PageSize=10&Search=kaan",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "User"
+          ],
+          "query": [
+            {
+              "key": "Page",
+              "value": "1"
+            },
+            {
+              "key": "PageSize",
+              "value": "10"
+            },
+            {
+              "key": "Search",
+              "value": "kaan"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "1C - Geçersiz Pagination (GET 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code 400 olmalı', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "pm.test('Page validation mesajı gelmeli', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response.message).to.eql('Page değeri en az 1 olmalıdır.');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/User?Page=0&PageSize=10",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "User"
+          ],
+          "query": [
+            {
+              "key": "Page",
+              "value": "0"
+            },
+            {
+              "key": "PageSize",
+              "value": "10"
+            }
           ]
         }
       }

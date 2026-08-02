@@ -34,10 +34,32 @@ public class UserService : IUserService
     /// <summary>
     /// Veritabanındaki tüm kullanıcıları liste olarak döner.
     /// </summary>
-    public async Task<List<UserDto>> GetAllAsync()
+    public async Task<PagedResponse<UserDto>> GetAllAsync(UserListQuery query)
     {
-        return await _context.Users
-            .AsNoTracking()
+        IQueryable<User> usersQuery = _context.Users
+            .AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            string searchPattern = $"%{query.Search.Trim()}%";
+
+            usersQuery = usersQuery.Where(user =>
+                EF.Functions.ILike(user.Name, searchPattern) ||
+                EF.Functions.ILike(user.Email, searchPattern)
+            );
+        }
+
+        int totalCount = await usersQuery.CountAsync();
+
+        int totalPages = (int)Math.Ceiling(
+            totalCount / (double)query.PageSize
+        );
+
+        List<UserDto> items = await usersQuery
+            .OrderBy(user => user.Name)
+            .ThenBy(user => user.Id)
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
             .Select(user => new UserDto
             {
                 Id = user.Id,
@@ -45,6 +67,15 @@ public class UserService : IUserService
                 Email = user.Email
             })
             .ToListAsync();
+
+        return new PagedResponse<UserDto>
+        {
+            Items = items,
+            Page = query.Page,
+            PageSize = query.PageSize,
+            TotalCount = totalCount,
+            TotalPages = totalPages
+        };
     }
 
     /// <summary>
@@ -65,7 +96,9 @@ public class UserService : IUserService
 
         if (user is null)
         {
-            throw new NotFoundException($"ID'si {parsedId} olan kullanıcı bulunamadı.");
+            throw new NotFoundException(
+                $"ID'si {parsedId} olan kullanıcı bulunamadı."
+            );
         }
 
         return ToDto(user);
@@ -94,7 +127,10 @@ public class UserService : IUserService
             UserType = "User"
         };
 
-        user.PasswordHash = _passwordHasher.HashPassword(user, model.Password);
+        user.PasswordHash = _passwordHasher.HashPassword(
+            user,
+            model.Password
+        );
 
         _context.Users.Add(user);
 
