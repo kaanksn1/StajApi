@@ -1,697 +1,1033 @@
-STAJ API PROJE AÇIKLAMALARI
-===========================
+STAJ API - KURULUM, PROJE YAPISI, YAPILANLAR VE TEST REHBERİ
+================================================================
 
-1. PROJENİN GENEL ÇALIŞMA AKIŞI
--------------------------------
+Bu dosya projeyi başka bir bilgisayarda çalıştırmak, yapılan işleri
+anlamak ve bütün özellikleri test etmek için hazırlanmıştır.
 
-Projede bir HTTP isteği aşağıdaki sırayla ilerler:
+Güncel çalışma branch'i:
 
-Request Body
+    feature/user-pagination
+
+Bu branch; PostgreSQL, Entity Framework Core, User CRUD, validation,
+Swagger, şifre hashleme, JWT, Postman koleksiyonu, kullanıcı arama ve
+sayfalama çalışmalarının tamamını içerir.
+
+
+1. PROJENİN AMACI
+-----------------
+
+Bu proje .NET 10 ile geliştirilmiş bir ASP.NET Core Web API projesidir.
+MVC görünümü veya HTML sayfası yoktur. İstemciler API'ye HTTP istekleri
+gönderir, API de çoğunlukla JSON cevap verir.
+
+Projede iki bölüm vardır:
+
+1. Stajyer işlemleri
+   İlk öğrendiğimiz basit, bellek içi CRUD örneğidir. Uygulama yeniden
+   başlatılınca sonradan eklenen stajyerler silinir.
+
+2. User işlemleri
+   PostgreSQL ve Entity Framework Core kullanır. Veriler veritabanında
+   kalıcıdır. User CRUD, validation, şifre hashleme, login, JWT,
+   pagination ve search özellikleri burada bulunur.
+
+Kullanılan teknolojiler:
+
+- .NET 10 / ASP.NET Core Web API
+- C#
+- PostgreSQL 17
+- Docker Desktop
+- Entity Framework Core 10
+- Npgsql PostgreSQL provider
+- Swagger / OpenAPI
+- Postman
+- DBeaver
+- JWT Bearer Authentication
+- ASP.NET Core PasswordHasher
+
+
+2. PROJEYİ GITHUB'DAN ALMA
+--------------------------
+
+Repo zaten bilgisayardaysa:
+
+    git fetch origin
+    git switch feature/user-pagination
+    git pull origin feature/user-pagination
+
+İlk kez indirilecekse repo klonlandıktan sonra proje klasörüne girilir
+ve branch açılır:
+
+    git clone REPO_ADRESI
+    cd StajApi
+    git switch feature/user-pagination
+
+Kontrol:
+
+    git status
+    git branch --show-current
+
+Beklenen branch adı `feature/user-pagination` olmalıdır.
+
+
+3. GEREKLİ PROGRAMLAR
+---------------------
+
+- .NET 10 SDK
+- Docker Desktop
+- Postman
+- İsteğe bağlı olarak DBeaver
+- Visual Studio Code ve C# eklentisi
+
+Kontrol komutları:
+
+    dotnet --version
+    docker --version
+
+
+4. POSTGRESQL CONTAINER'I ÇALIŞTIRMA
+-----------------------------------
+
+Docker Desktop açılır. Daha önce oluşturulmuş `staj-postgres-1`
+container'ı varsa çalıştırılır:
+
+    docker start staj-postgres-1
+
+Kontrol:
+
+    docker ps
+
+Beklenen bilgiler:
+
+- Container: staj-postgres-1
+- Image: postgres:17-alpine
+- Port: 5432:5432
+- Database: StajApiDb
+- Username: postgres
+
+Container hiç yoksa örnek olarak şu şekilde oluşturulabilir:
+
+    docker run --name staj-postgres-1 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=StajApiDb -p 5432:5432 -d postgres:17-alpine
+
+Buradaki `postgres` sadece yerel deneme şifresidir. Farklı şifre
+seçilirse aşağıdaki local ayarda da aynı şifre yazılmalıdır.
+
+
+5. LOCAL AYAR DOSYASI
+---------------------
+
+Güvenlik bilgileri GitHub'a gönderilmez. Proje kökünde
+`appsettings.Local.json` oluşturulur. Bu dosya `.gitignore` içindedir.
+
+Örnek içerik:
+
+{
+  "Jwt": {
+    "Key": "CHANGE-THIS-LOCAL-KEY-AT-LEAST-32-CHARACTERS",
+    "Issuer": "StajApi",
+    "Audience": "StajApiClients",
+    "ExpirationMinutes": 60
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=StajApiDb;Username=postgres;Password=YOUR_DB_PASSWORD"
+  }
+}
+
+Yapılacak değişiklikler:
+
+- Jwt:Key yerine en az 32 karakterlik kişisel bir deneme anahtarı yaz.
+- YOUR_DB_PASSWORD yerine Docker PostgreSQL şifreni yaz.
+- Bu dosyayı commit veya push etme.
+
+`appsettings.json` içinde alanlar boş şablon olarak tutulur. Program
+önce bu dosyayı, sonra varsa `appsettings.Local.json` dosyasını okur.
+Local dosyadaki değerler şablondaki boş değerleri ezer.
+
+
+6. İLK KURULUM VE ÇALIŞTIRMA
+----------------------------
+
+Proje klasöründe sırayla:
+
+    dotnet restore
+    dotnet tool restore
+    dotnet tool run dotnet-ef database update
+    dotnet build
+    dotnet run
+
+`dotnet ef` sistemde doğrudan çalışıyorsa migration komutu şu şekilde
+de kullanılabilir:
+
+    dotnet ef database update
+
+Başarılı çalışınca terminalde buna benzer satır görülür:
+
+    Now listening on: http://localhost:5039
+
+Swagger:
+
+    http://localhost:5039/swagger
+
+OpenAPI JSON:
+
+    http://localhost:5039/swagger/v1/swagger.json
+
+Uygulamayı durdurmak için terminalde Control + C kullanılır.
+
+
+7. İSTEK PROJEDE NASIL İLERLİYOR?
+---------------------------------
+
+Örnek bir POST isteğinin yolu:
+
+İstemci / Postman / Swagger
+    -> HTTP isteği
+    -> Routing
     -> Model Binding
     -> Model Validation
     -> UserController
     -> IUserService
     -> UserService
     -> AppDbContext
+    -> Entity Framework Core
     -> PostgreSQL
+    -> Service response modeli
+    -> Controller HTTP sonucu
+    -> JSON cevap
 
-Controller HTTP isteğini karşılar. Asıl kullanıcı arama, ekleme,
-güncelleme ve silme işlemleri UserService içerisinde yapılır.
-AppDbContext ise C# kodu ile PostgreSQL arasındaki bağlantıyı sağlar.
+Controller sade tutulmuştur. Controller'ın işi isteği almak, doğru
+service metodunu çağırmak ve uygun HTTP cevabını dönmektir. İş kuralı
+ve veritabanı işlemi controller içine yazılmamıştır.
 
 
-2. INTERFACE NEDİR?
--------------------
-
-IUserService bir interface'tir. Interface, service sınıfının hangi
-metotları sağlamak zorunda olduğunu belirleyen bir sözleşmedir.
-
-IUserService içerisindeki metotlar:
-
-Task<List<UserDto>> GetAllAsync();
-Task<UserDto> GetByIdAsync(Guid id);
-Task<UserDto> CreateAsync(UserCreateModel model);
-Task<UserActionResponse> UpdateAsync(Guid id, UserUpdateModel model);
-Task DeleteAsync(Guid id);
-
-Interface bu işlemlerin nasıl yapılacağını yazmaz. İşlemlerin gerçek
-kodları UserService içerisinde bulunur.
-
-UserService şu şekilde interface'i uygular:
-
-public class UserService : IUserService
-
-Bu ifade UserService sınıfının IUserService içerisindeki bütün metotları
-uygulamak zorunda olduğunu gösterir.
-
-Hocaya kısa cevap:
-
-"Interface service katmanının sözleşmesidir. Controller doğrudan somut
-UserService sınıfına değil IUserService interface'ine bağlı çalışır."
-
-
-3. DEPENDENCY INJECTION VE SERVICE ÇAĞRISI
-------------------------------------------
-
-Program.cs içerisinde interface ile service eşleştirilir:
-
-builder.Services.AddScoped<IUserService, UserService>();
-
-Bu satırın anlamı:
-
-"Bir sınıf IUserService istediğinde ona UserService nesnesi ver."
-
-Controller service'i constructor üzerinden alır:
-
-private readonly IUserService _userService;
-
-public UserController(IUserService userService)
-{
-    _userService = userService;
-}
-
-Controller içerisindeki örnek service çağrısı:
-
-return Ok(await _userService.GetByIdAsync(id));
-
-Controller yalnızca service'i çağırır. Kullanıcıyı veritabanında arama
-işlemini kendisi yapmaz.
-
-
-4. CONTROLLER NEDEN TEMİZ TUTULDU?
-----------------------------------
-
-UserController içerisinden aşağıdaki işlemler çıkarıldı:
-
-- Bellekte tutulan kullanıcı listesi
-- FirstOrDefault ile kullanıcı arama kodları
-- AppDbContext kullanımı
-- Hata mesajları
-- Kullanıcı oluşturma iş mantığı
-- Güncelleme ve silme iş mantığı
-
-Controller içerisinde yalnızca HTTP ile ilgili kodlar ve service çağrıları
-kaldı.
-
-Tekil kullanıcı getirme örneği:
-
-public async Task<ActionResult<UserDto>> GetById(Guid id)
-{
-    return Ok(await _userService.GetByIdAsync(id));
-}
-
-Silme örneği:
-
-public async Task<IActionResult> Delete(Guid id)
-{
-    await _userService.DeleteAsync(id);
-    return NoContent();
-}
-
-"Controller boş olacak" ifadesi, controller'ın tamamen kodsuz olması
-değildir. Controller'ın iş mantığı ve veritabanı kodu içermemesi demektir.
-
-
-5. SERVICE KATMANI VE İŞ KURALLARI
-----------------------------------
-
-UserService asıl kullanıcı işlemlerini ve iş kurallarını yürütür.
-
-Projede bulunan bazı iş kuralları:
-
-- Kullanıcı ID'si API tarafından Guid.NewGuid() ile oluşturulur.
-- Aynı email adresiyle ikinci kullanıcı oluşturulamaz.
-- Update işleminde yalnızca Name değiştirilebilir.
-- ID ve Email update ile değiştirilemez.
-- Olmayan kullanıcı getirilemez, güncellenemez veya silinemez.
-- Name ve Email üzerindeki gereksiz boşluklar temizlenir.
-- Email küçük harfe dönüştürülerek saklanır.
-
-Aynı email kontrolü:
-
-bool emailExists = await _context.Users
-    .AnyAsync(user => user.Email == normalizedEmail);
-
-if (emailExists)
-{
-    throw new ConflictException(
-        $"{normalizedEmail} email adresi zaten kullanılıyor."
-    );
-}
-
-Yalnızca Name güncelleme:
-
-user.Name = model.Name.Trim();
-
-user.Id veya user.Email için atama yapılmadığından bu alanlar değişmez.
-
-
-6. HATA MESAJI VE HATAYI YAKALAMA ARASINDAKİ FARK
---------------------------------------------------
-
-Service hatayı tespit eder, hata türünü ve mesajını oluşturur:
-
-if (user is null)
-{
-    throw new NotFoundException(
-        $"ID'si {id} olan kullanıcı bulunamadı."
-    );
-}
-
-Burada:
-
-- throw hatayı fırlatır.
-- NotFoundException hatanın türüdür.
-- "ID'si ... olan kullanıcı bulunamadı." hata mesajıdır.
-
-GlobalExceptionHandler fırlatılan hatayı yakalar ve HTTP cevabına çevirir:
-
-- NotFoundException -> 404 Not Found
-- ConflictException -> 409 Conflict
-- Beklenmeyen hata -> 500 Internal Server Error
-
-Oluşan JSON cevabı örneği:
-
-{
-  "message": "ID'si ... olan kullanıcı bulunamadı."
-}
-
-Hocaya kısa cevap:
-
-"Service hatayı tespit edip fırlatır. GlobalExceptionHandler hatayı
-yakalayıp uygun HTTP durum kodu ve JSON hata cevabına çevirir."
-
-
-7. MODEL BINDING NEDİR?
------------------------
-
-Swagger veya Postman üzerinden gönderilen JSON örneği:
-
-{
-  "name": "Kaan",
-  "email": "kaan@example.com"
-}
-
-Controller'daki parametre:
-
-Create([FromBody] UserCreateModel model)
-
-ASP.NET gelen JSON verisini okuyup UserCreateModel nesnesine dönüştürür.
-Bu işleme model binding denir.
-
-Dönüşümden sonra verilere şu şekilde erişilir:
-
-model.Name
-model.Email
-
-
-8. DATABASE'E GİTMEDEN MODEL VALIDATION
----------------------------------------
-
-UserCreateModel içerisinde Data Annotation kuralları bulunur:
-
-[Required(ErrorMessage = "Name alanı zorunludur.")]
-[StringLength(
-    100,
-    MinimumLength = 2,
-    ErrorMessage = "Name 2 ile 100 karakter arasında olmalıdır."
-)]
-public string Name { get; set; } = string.Empty;
-
-[Required(ErrorMessage = "Email alanı zorunludur.")]
-[EmailAddress(ErrorMessage = "Geçerli bir email adresi girilmelidir.")]
-[StringLength(254)]
-public string Email { get; set; } = string.Empty;
-
-Kuralların anlamları:
-
-- Required: Alan zorunludur.
-- StringLength: Karakter sınırını kontrol eder.
-- EmailAddress: Email biçimini kontrol eder.
-
-Controller'da [ApiController] bulunduğu için ASP.NET model validation
-işlemini otomatik yapar.
-
-Geçersiz body örneği:
-
-{
-  "name": "K"
-}
-
-Bu istekte Name iki karakterden kısa ve Email eksiktir. Sonuç:
-
-- 400 Bad Request döner.
-- Controller metodu çalışmaz.
-- Service çağrılmaz.
-- PostgreSQL'e sorgu gönderilmez.
-
-Bu nedenle controller'a elle ModelState.IsValid kontrolü yazılması
-gerekmez.
-
-Hocaya kısa cevap:
-
-"Data Annotation ile yapılan model validation, controller ve service
-çalışmadan önce gerçekleşir. Geçersiz istek 400 döner ve database'e
-gitmez."
-
-
-9. VALIDATION TÜRLERİ
----------------------
-
-Projede üç seviyede validation vardır:
-
-A) Request model validation
-
-Gelen body'nin biçimini kontrol eder:
-
-- Name gönderildi mi?
-- Name en az 2, en fazla 100 karakter mi?
-- Email gönderildi mi?
-- Email biçimi geçerli mi?
-
-Geçmezse 400 Bad Request döner ve database'e gidilmez.
-
-B) Service iş kuralı validation
-
-Biçim olarak doğru olan verinin uygulama kurallarına uygunluğunu kontrol
-eder:
-
-- Email daha önce kullanılmış mı?
-- Güncellemede yalnızca Name mi değişiyor?
-- Güncellenecek veya silinecek kullanıcı var mı?
-
-Örneğin email doğru biçimde olsa bile daha önce kullanılmışsa
-409 Conflict döner.
-
-C) Database validation
-
-Son güvenlik katmanıdır. PostgreSQL tablosundaki verinin bütünlüğünü
-korur:
-
-- Name boş olamaz.
-- Name 100 karakteri geçemez.
-- Email boş olamaz.
-- Email 254 karakteri geçemez.
-- Aynı email iki kere kaydedilemez.
-
-
-10. APPDBCONTEXT NEDİR?
------------------------
-
-AppDbContext, Entity Framework Core ile PostgreSQL arasındaki köprüdür.
-
-Tanımı:
-
-public class AppDbContext : DbContext
-
-İçerisindeki:
-
-public DbSet<User> Users => Set<User>();
-
-ifadesi PostgreSQL'deki Users tablosunun C# tarafındaki karşılığıdır.
-
-UserService içerisine constructor ile aktarılır:
-
-private readonly AppDbContext _context;
-
-public UserService(AppDbContext context)
-{
-    _context = context;
-}
-
-Service içerisinde:
-
-_context.Users
-
-yazıldığında PostgreSQL'deki Users tablosu üzerinde işlem yapılır.
-
-Hocaya kısa cevap:
-
-"AppDbContext Entity Framework'ün PostgreSQL bağlantısını ve tabloları
-yönettiği sınıftır. DbSet User ise Users tablosunun C# karşılığıdır."
-
-
-11. FIRSTORDEFAULTASYNC NEDİR?
+8. KLASÖR VE DOSYALARIN GÖREVİ
 ------------------------------
 
-Kullanıcıyı ID ile arayan kod:
-
-User? user = await _context.Users
-    .FirstOrDefaultAsync(user => user.Id == id);
-
-Anlamı:
-
-"ID değeri verilen ID'ye eşit olan ilk kullanıcıyı getir. Bulamazsan null
-döndür."
-
-Entity Framework bunu yaklaşık olarak aşağıdaki SQL sorgusuna çevirir:
-
-SELECT *
-FROM "Users"
-WHERE "Id" = ...
-LIMIT 1;
-
-FirstOrDefaultAsync ile FirstAsync farkı:
-
-- FirstOrDefaultAsync bulamazsa null döndürür.
-- FirstAsync bulamazsa doğrudan exception fırlatır.
-
-Projede kendi hata mesajımızı oluşturabilmek için FirstOrDefaultAsync
-kullanılır.
-
-
-12. ASNOTRACKING NEDİR?
------------------------
-
-Sadece veri okunan sorgularda kullanılır:
-
-_context.Users
-    .AsNoTracking()
-    .FirstOrDefaultAsync(...);
-
-Entity Framework normalde getirdiği nesnelerde yapılan değişiklikleri takip
-eder. AsNoTracking kullanıldığında değişiklik takibi yapılmaz.
-
-Getirme ve listeleme işlemlerinde veriyi değiştirmediğimiz için
-AsNoTracking kullanmak daha az kaynak tüketir.
-
-Update ve Delete işlemlerinde nesne değiştirileceği için AsNoTracking
-kullanılmaz.
-
-
-13. SAVECHANGESASYNC NEDEN GEREKLİ?
------------------------------------
-
-Yeni kullanıcı ekleme:
-
-_context.Users.Add(user);
-
-Add metodu kullanıcıyı hemen PostgreSQL'e kaydetmez. Entity Framework'e
-bu kullanıcının ekleneceğini bildirir.
-
-Gerçek kayıt:
-
-await _context.SaveChangesAsync();
-
-çalışınca PostgreSQL'e gönderilir.
-
-Güncelleme:
-
-user.Name = model.Name.Trim();
-await _context.SaveChangesAsync();
-
-Entity Framework değişen Name alanını takip eder. SaveChangesAsync
-çalıştığında yaklaşık olarak UPDATE sorgusu gönderilir.
-
-Silme:
-
-_context.Users.Remove(user);
-await _context.SaveChangesAsync();
-
-Remove kullanıcıyı silinecek olarak işaretler. SaveChangesAsync gerçek
-DELETE sorgusunu PostgreSQL'e gönderir.
-
-Özet:
-
-- Add: Eklenecek olarak işaretler.
-- Property değiştirmek: Güncellenecek değer takip edilir.
-- Remove: Silinecek olarak işaretler.
-- SaveChangesAsync: Değişiklikleri PostgreSQL'e uygular.
-
-
-14. NEDEN BÜTÜN DATABASE METOTLARI ASYNC?
------------------------------------------
-
-Örnek metot:
-
-public async Task<UserDto> GetByIdAsync(Guid id)
-
-İçindeki kullanım:
-
-await _context.Users.FirstOrDefaultAsync(...);
-
-Kavramların anlamları:
-
-- async: Metodun asenkron çalışabileceğini belirtir.
-- Task<UserDto>: İşlem tamamlandığında UserDto döndürüleceğini belirtir.
-- await: PostgreSQL cevabını thread'i bloke etmeden bekler.
-
-Database işlemleri I/O işlemidir. API, PostgreSQL'den cevap beklerken
-thread'i boş yere kilitlememek için async metotlar kullanılır.
-
-Asenkron kullanım tek bir sorguyu mutlaka daha hızlı yapmaz. Aynı anda çok
-sayıda istek geldiğinde API'nin bekleme süresinde başka isteklerle
-ilgilenebilmesini sağlar.
-
-Kullanılan EF Core async metotları:
-
-- ToListAsync
-- FirstOrDefaultAsync
-- AnyAsync
-- SaveChangesAsync
-
-Hocaya kısa cevap:
-
-"Database işlemleri I/O işlemidir. PostgreSQL cevabını beklerken thread'i
-bloke etmemek ve API'nin aynı anda daha fazla istek karşılayabilmesi için
-Entity Framework'ün async metotlarını kullanıyorum."
-
-
-15. ENTITY FRAMEWORK CORE NEDİR?
---------------------------------
-
-Entity Framework Core, C# nesneleriyle ilişkisel veritabanı arasında
-çalışan ORM aracıdır.
-
-ORM, Object Relational Mapper anlamına gelir.
-
-Entity Framework sayesinde çoğu SQL sorgusunu elle yazmak yerine C# ile
-yazabiliriz.
-
-C#:
-
-await _context.Users.ToListAsync();
-
-Yaklaşık SQL karşılığı:
-
-SELECT * FROM "Users";
-
-C#:
-
-_context.Users.Add(user);
-await _context.SaveChangesAsync();
-
-Yaklaşık SQL karşılığı:
-
-INSERT INTO "Users" ...;
-
-
-16. POSTGRESQL TARAFINDA YAPILANLAR
------------------------------------
-
-- Docker'daki staj-postgres-1 container'ı kullanıldı.
-- StajApiDb veritabanı kullanıldı.
-- Entity Framework Core ve Npgsql projeye eklendi.
-- AppDbContext ile PostgreSQL bağlantısı kuruldu.
-- Users tablosu oluşturuldu.
-- Id alanı PostgreSQL'de uuid olarak oluşturuldu.
-- Name zorunlu ve en fazla 100 karakter yapıldı.
-- Email zorunlu ve en fazla 254 karakter yapıldı.
-- Email alanına unique index eklendi.
-- Fatih ve Rüstem başlangıç verisi olarak eklendi.
-- GET, POST, PUT ve DELETE işlemleri PostgreSQL üzerinde çalıştırıldı.
-
-Users tablosunun yapısı:
-
-StajApiDb
-    -> Users
-        -> Id
-        -> Name
-        -> Email
-
-
-17. MIGRATION NEDİR?
---------------------
-
-Migration, C# tarafındaki entity ve AppDbContext kurallarını PostgreSQL
-tablo yapısına dönüştüren değişiklik dosyasıdır.
-
-Migration listesini görmek:
-
-dotnet tool run dotnet-ef migrations list
-
-Migration'ı PostgreSQL'e uygulamak:
-
-dotnet tool run dotnet-ef database update
-
-Hocaya kısa cevap:
-
-"Migration C# modelinde tanımlanan tablo ve kolon kurallarını PostgreSQL
-veritabanına uygular."
-
-
-18. POSTGRESQL TEMEL KOMUTLARI
-------------------------------
-
-Docker container'ını başlatma:
-
-docker start staj-postgres-1
-
-PostgreSQL terminaline girme:
-
-docker exec -it staj-postgres-1 psql -U postgres -d StajApiDb
-
-Tabloları listeleme:
-
-\dt
-
-Users tablosunun yapısını görme:
-
-\d "Users"
-
-Kullanıcıları listeleme:
-
-SELECT * FROM "Users";
-
-Kullanıcı ekleme:
-
-INSERT INTO "Users" ("Id", "Name", "Email")
-VALUES (gen_random_uuid(), 'Ayşe', 'ayse@example.com');
-
-Kullanıcı adını değiştirme:
-
-UPDATE "Users"
-SET "Name" = 'Ayşe Güncel'
-WHERE "Email" = 'ayse@example.com';
-
-Kullanıcı silme:
-
-DELETE FROM "Users"
-WHERE "Email" = 'ayse@example.com';
-
-PostgreSQL terminalinden çıkma:
-
-\q
-
-Docker'daki çöp kutusu container'ı siler. SQL DELETE ise yalnızca
-Users tablosundaki seçilen kullanıcı kaydını siler.
-
-Normal kullanımda kayıt işlemlerini Swagger üzerinden yapmak daha
-doğrudur. SQL ile doğrudan işlem yapılırsa service iş kuralları atlanır.
-
-
-19. DATABASE BAĞLANTI BİLGİSİ
-------------------------------
-
-Database bağlantısı appsettings.json içerisindeki DefaultConnection
-alanından okunur.
-
-Bağlantı bilgisinde şunlar bulunur:
-
-- Host: PostgreSQL'in çalıştığı adres
-- Port: PostgreSQL portu
-- Database: Veritabanı adı
-- Username: PostgreSQL kullanıcı adı
-- Password: PostgreSQL bağlantı şifresi
-
-Program.cs içerisindeki:
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    ));
-
-kodu appsettings.json içerisindeki DefaultConnection değerini okuyarak
-AppDbContext'i PostgreSQL'e bağlar.
-
-
-20. PROJE KLASÖR YAPISI
------------------------
+Program.cs
+    Uygulamanın başlangıç dosyasıdır. Controller, DbContext, service,
+    JWT, Swagger, authentication, authorization ve exception handler
+    burada kaydedilir. HTTP pipeline sırası da burada kurulur.
 
 Controllers/
+    HTTP isteklerini karşılar.
+
     UserController.cs
+        User CRUD, pagination ve search endpointleri.
+
+    AuthController.cs
+        Login ve JWT doğrulama endpointleri.
+
+    StajyerlerController.cs
+        İlk öğrenme aşamasındaki bellek içi stajyer CRUD örneği.
 
 Services/
+    İş kuralları ve veritabanı işlemleri burada yürütülür.
+
     UserService.cs
-    Interfaces/
-        IUserService.cs
+        Kullanıcı listeleme, arama, tekil get, create, update ve delete.
 
-Models/
-    Entities/
-        User.cs
-    Requests/
-        UserCreateModel.cs
-        UserUpdateModel.cs
-    Responses/
-        UserDto.cs
-        UserActionResponse.cs
+    AuthService.cs
+        Şifre doğrulama, JWT üretme ve claimleri response'a çevirme.
 
-Data/
-    AppDbContext.cs
-    AppDbContextFactory.cs
+Services/Interfaces/
+    Service sözleşmelerini tutar.
+
+    IUserService.cs
+        UserService'in uygulamak zorunda olduğu metotları belirler.
+
+    IAuthService.cs
+        AuthService'in uygulamak zorunda olduğu metotları belirler.
+
+Models/Entities/User.cs
+    PostgreSQL'deki Users tablosunu temsil eden Entity'dir.
+
+Models/Requests/
+    API'ye gelen verilerin şeklidir.
+
+    UserCreateModel.cs
+        Name, Email, Password alır. ID istemciden alınmaz.
+
+    UserUpdateModel.cs
+        Yalnızca Name alır. ID ve Email değiştirilemez.
+
+    LoginRequest.cs
+        Email ve Password alır.
+
+    UserListQuery.cs
+        Page, PageSize ve isteğe bağlı Search query değerlerini alır.
+
+Models/Responses/
+    API'nin dışarıya döndürdüğü güvenli cevap modelleridir.
+
+    UserDto.cs
+        Id, Name ve Email döndürür. PasswordHash dışarı çıkmaz.
+
+    PagedResponse.cs
+        Items, Page, PageSize, TotalCount ve TotalPages bilgilerini tutar.
+
+    LoginResponse.cs
+        JWT, token türü ve sona erme zamanını döndürür.
+
+    TokenValidationResponse.cs
+        Token geçerliyse kullanıcı ve claim bilgilerini döndürür.
+
+data/AppDbContext.cs
+    EF Core ile PostgreSQL arasındaki bağlantıyı ve Users tablosunun
+    kurallarını tanımlar.
+
+data/AppDbContextFactory.cs
+    Migration komutları çalışırken DbContext oluşturur ve ayarları okur.
 
 Exceptions/
-    NotFoundException.cs
-    ConflictException.cs
+    BadRequestException, UnauthorizedException, NotFoundException ve
+    ConflictException gibi anlamlı özel hata türlerini içerir.
 
-ExceptionHandling/
-    GlobalExceptionHandler.cs
+ExceptionHandling/GlobalExceptionHandler.cs
+    Service'ten gelen exception'ları uygun HTTP durum koduna ve sade
+    JSON hata mesajına dönüştürür.
 
 Migrations/
-    InitialCreate...
+    Veritabanı şemasındaki değişikliklerin kodla tutulduğu geçmiş.
 
-Klasörlerin görevleri:
+postman/StajApi.postman_collection.json
+    Hazır Postman istekleri, değişkenleri ve otomatik testleri içerir.
 
-- Controllers: HTTP isteklerini karşılar.
-- Services: İş kurallarını ve database işlemlerini yürütür.
-- Interfaces: Service sözleşmelerini tutar.
-- Entities: PostgreSQL tablolarını temsil eder.
-- Requests: API'ye gelen request body modelleridir.
-- Responses: API'nin istemciye döndürdüğü veri modelleridir.
-- Data: Entity Framework ve tablo yapılandırmasıdır.
-- Exceptions: Özel hata türleridir.
-- ExceptionHandling: Hataları HTTP cevaplarına çevirir.
-- Migrations: Veritabanı yapısının değişiklik geçmişidir.
+swagger.json
+    API'nin güncel OpenAPI belgesinin repo içindeki kopyasıdır.
+
+docs/swagger.png
+    Swagger ekran görüntüsüdür.
 
 
-21. ENDPOINT ÖZETİ
+9. INTERFACE, SERVICE VE DEPENDENCY INJECTION
+--------------------------------------------
+
+Interface, bir sınıfın hangi metotları sunması gerektiğini belirleyen
+sözleşmedir. Metodun nasıl çalışacağını değil, imzasını söyler.
+
+IUserService içindeki güncel metotlar:
+
+    Task<PagedResponse<UserDto>> GetAllAsync(UserListQuery query)
+    Task<UserDto> GetByIdAsync(string id)
+    Task<UserDto> CreateAsync(UserCreateModel model)
+    Task<UserActionResponse> UpdateAsync(Guid id, UserUpdateModel model)
+    Task DeleteAsync(Guid id)
+
+UserService : IUserService yazdığı için bu sözleşmeyi uygular.
+
+Dependency Injection, ihtiyaç duyulan nesnenin sınıf içinde `new` ile
+üretilmek yerine dışarıdan verilmesidir. Program.cs içindeki kayıt:
+
+    builder.Services.AddScoped<IUserService, UserService>();
+
+Controller constructor'ında IUserService ister. ASP.NET Core her HTTP
+isteği için uygun UserService nesnesini verir.
+
+Scoped lifecycle, aynı HTTP isteği boyunca aynı service/DbContext
+örneğinin kullanılması; başka istekte yeni örnek oluşturulmasıdır.
+
+
+10. USER ENDPOINTLERİ
+---------------------
+
+1. Listeleme, sayfalama ve arama
+
+    GET /api/User?Page=1&PageSize=10&Search=kaan
+
+Search zorunlu değildir. Name veya Email içinde büyük/küçük harf
+duyarsız arama yapar. Request body kullanılmaz; değerler query string
+ile gelir.
+
+Başarılı cevap: 200 OK
+
+{
+  "items": [
+    {
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "Fatih",
+      "email": "fatih.ulus@pointr.tech"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "totalCount": 1,
+  "totalPages": 1,
+  "hasPreviousPage": false,
+  "hasNextPage": false
+}
+
+2. Tek kullanıcı
+
+    GET /api/User/{id}
+
+Örnek:
+
+    GET /api/User/11111111-1111-1111-1111-111111111111
+
+Geçersiz GUID: 400 Bad Request
+Geçerli formatta olup bulunmayan GUID: 404 Not Found
+Bulunan kullanıcı: 200 OK
+
+3. Kullanıcı oluşturma
+
+    POST /api/User
+
+Request body:
+
+{
+  "name": "Test Kullanıcı",
+  "email": "test.kullanici@example.com",
+  "password": "Password123!"
+}
+
+Başarılı: 201 Created
+Geçersiz alanlar: 400 Bad Request
+Aynı email: 409 Conflict
+
+ID, API içinde `Guid.NewGuid()` ile otomatik üretilir. UserType otomatik
+olarak `User` olur. Düz şifre veritabanına yazılmaz.
+
+4. Kullanıcı adı güncelleme
+
+    PUT /api/User/{id}
+
+Request body:
+
+{
+  "name": "Yeni İsim"
+}
+
+Modelde sadece Name olduğu için ID ve Email request body ile
+değiştirilemez. Başarılı cevap 200 OK ve mesajdır:
+
+{
+  "message": "User \"GUID\" updated"
+}
+
+5. Kullanıcı silme
+
+    DELETE /api/User/{id}
+
+Başarılı: 204 No Content
+Kullanıcı yoksa: 404 Not Found
+
+
+11. AUTH VE JWT ENDPOINTLERİ
+----------------------------
+
+1. Login
+
+    POST /api/Auth/login
+
+Request body:
+
+{
+  "email": "test.kullanici@example.com",
+  "password": "Password123!"
+}
+
+AuthService email ile kullanıcıyı bulur ve PasswordHasher ile girilen
+şifreyi veritabanındaki hash'e karşı doğrular. Email veya şifre yanlışsa
+401 Unauthorized döner. Doğruysa 200 OK ile JWT döner.
+
+2. JWT doğrulama
+
+    GET /api/Auth/validate
+
+Header:
+
+    Authorization: Bearer JWT_TOKEN
+
+Geçerli token: 200 OK
+Eksik, bozuk veya süresi geçmiş token: 401 Unauthorized
+
+JWT içine eklenen claimler:
+
+- sub: kullanıcının GUID değeri
+- jti: tokenın benzersiz kimliği
+- name: kullanıcı adı
+- email: kullanıcı emaili
+- type: User
+- role: User
+
+`[Authorize]` attribute'u validate endpointine yalnızca geçerli tokenla
+ulaşılmasını sağlar.
+
+
+12. ŞİFRE HASHLEME
 ------------------
 
-GET /api/User
+Kullanıcının yazdığı düz şifre saklanmaz. Create sırasında:
 
-Tüm kullanıcıları PostgreSQL'den getirir.
+    _passwordHasher.HashPassword(user, model.Password)
 
-GET /api/User/{id}
+ile hash üretilir ve PasswordHash alanına yazılır.
 
-Guid ID değerine sahip tek kullanıcıyı getirir. Kullanıcı yoksa 404
-döner.
+Aynı şifre farklı kullanıcılarda farklı hash oluşturabilir. Bunun
+nedeni hashleme sırasında rastgele salt kullanılmasıdır. Login sırasında
+hash geri çözülmez; `VerifyHashedPassword` ile girilen şifrenin hash ile
+uyumlu olup olmadığı kontrol edilir.
 
-POST /api/User
-
-Name ve Email alır. ID'yi Guid.NewGuid() ile API üretir. Başarılıysa
-201 Created döner. Aynı email kullanılmışsa 409 Conflict döner.
-
-PUT /api/User/{id}
-
-Yalnızca Name alanını değiştirir. ID ve Email değişmez. Kullanıcı yoksa
-404 döner.
-
-DELETE /api/User/{id}
-
-Guid ID ile kullanıcıyı siler. Başarılıysa 204 No Content, kullanıcı
-yoksa 404 döner.
+UserDto içinde PasswordHash olmadığı için GET cevaplarında hash dışarı
+verilmez.
 
 
-22. HOCAYA GENEL KISA ÖZET
---------------------------
+13. VALIDATION - ÜÇ AŞAMALI DOĞRULAMA
+-------------------------------------
 
-"Controller'ı sadeleştirip kullanıcı arama ve CRUD işlemlerini
-IUserService üzerinden UserService'e taşıdım. IUserService service
-katmanının sözleşmesini belirliyor. UserService iş kurallarını ve Entity
-Framework üzerinden PostgreSQL işlemlerini yürütüyor. Hata mesajları
-service içinde oluşturuluyor ve GlobalExceptionHandler tarafından HTTP
-cevaplarına çevriliyor. Request modellerine Data Annotation, AppDbContext
-içine database kısıtları ekledim. Entity, request, response, interface,
-service ve exception dosyalarını ayrı klasörlerde düzenledim. Database
-işlemleri I/O olduğu için Entity Framework'ün async metotlarını
-kullanıyorum."
+1. Model validation
+
+Request modellerindeki Data Annotation attribute'ları çalışır:
+
+- [Required]: alan boş olamaz.
+- [EmailAddress]: email formatını kontrol eder.
+- [StringLength]: karakter sınırını kontrol eder.
+- [Range]: Page ve PageSize sınırlarını kontrol eder.
+- [MaxLength]: Search uzunluğunu kontrol eder.
+
+`[ApiController]` sayesinde geçersiz model controller metoduna girmeden
+400 döner. Program.cs içindeki InvalidModelStateResponseFactory bu
+hatayı sade bir JSON'a çevirir:
+
+{
+  "message": "Geçerli bir email adresi girilmelidir."
+}
+
+JSON'da eksik virgül, fazla virgül, tırnak veya parantez hatası varsa:
+
+{
+  "message": "JSON formatı geçersiz. Virgül, tırnak ve parantezleri kontrol edin."
+}
+
+2. Service / iş kuralı validation
+
+- Email küçük harfe çevrilip normalize edilir.
+- Aynı email daha önce kullanılmış mı kontrol edilir.
+- String ID, Guid.TryParse ile doğrulanır.
+- Kullanıcı bulunuyor mu kontrol edilir.
+- Login email ve şifresi doğrulanır.
+
+3. Database validation
+
+AppDbContext içinde:
+
+- Name NOT NULL, en fazla 100 karakter.
+- Email NOT NULL, en fazla 254 karakter ve UNIQUE.
+- PasswordHash NOT NULL, en fazla 500 karakter.
+- UserType NOT NULL, en fazla 50 karakter ve default User.
+- Id primary key.
+
+Model validation kullanıcıya hızlı ve anlaşılır hata verir. Service
+validation iş kurallarını korur. Database kısıtları ise son güvenlik
+katmanıdır; API dışından veri yazılmaya çalışılsa bile tabloyu korur.
+
+
+14. HATA YÖNETİMİ VE HTTP KODLARI
+---------------------------------
+
+UserService ve AuthService anlamlı exception üretir. Controller içine
+tekrar tekrar try/catch yazılmaz. GlobalExceptionHandler bütün hataları
+tek yerde aşağıdaki gibi çevirir:
+
+- BadRequestException       -> 400 Bad Request
+- UnauthorizedException     -> 401 Unauthorized
+- NotFoundException         -> 404 Not Found
+- ConflictException         -> 409 Conflict
+- Beklenmeyen exception      -> 500 Internal Server Error
+
+Ortak hata formatı:
+
+{
+  "message": "Hatanın anlaşılır açıklaması"
+}
+
+Temel başarı kodları:
+
+- 200 OK: GET, PUT, login veya validate başarılı.
+- 201 Created: kullanıcı başarıyla oluşturuldu.
+- 204 No Content: kullanıcı başarıyla silindi.
+
+
+15. ENTITY FRAMEWORK CORE, ENTITY, CONTEXT VE CODE FIRST
+--------------------------------------------------------
+
+Entity Framework Core, C# nesneleriyle veritabanı işlemi yapmamızı
+sağlayan ORM aracıdır. Çoğu durumda elle SQL yazmak yerine LINQ ve
+DbContext kullanılır.
+
+Entity, veritabanı tablosunu temsil eden C# sınıfıdır. User entity'si
+Users tablosunun Id, Name, Email, PasswordHash ve UserType kolonlarını
+temsil eder.
+
+AppDbContext, uygulama ile PostgreSQL arasındaki oturumdur. DbSet<User>
+Users tablosuna erişmemizi sağlar. OnModelCreating kolon, index,
+required, uzunluk ve seed data kurallarını tanımlar.
+
+Code First, önce C# entity ve kurallarını yazıp veritabanı şemasını
+migration ile bu koda göre oluşturmaktır.
+
+
+16. MIGRATION NEDİR?
+--------------------
+
+Migration, modelde yapılan veritabanı yapısı değişikliğinin sürümlenmiş
+C# kaydıdır. Migration dosyası tablo veya kolon değişimini tarif eder;
+veritabanı ancak `database update` çalışınca güncellenir.
+
+Projede bulunan temel migrationlar:
+
+- InitialCreate: Users tablosunu ve ilk seed kayıtları oluşturdu.
+- AddKaanSeedUser: Kaan seed kaydını ekledi.
+- AddPasswordHashAndUserType: PasswordHash ve UserType kolonlarını ekledi.
+
+Yeni migration örneği:
+
+    dotnet tool run dotnet-ef migrations add MigrationAdi
+    dotnet tool run dotnet-ef database update
+
+`__EFMigrationsHistory` tablosu hangi migrationların veritabanına
+uygulandığını tutar.
+
+
+17. EF CORE METOTLARI NEDEN KULLANILDI?
+---------------------------------------
+
+FirstOrDefaultAsync
+    Koşula uyan ilk kaydı getirir. Kayıt yoksa exception atmak yerine
+    null döndürür; biz null durumunda 404 üretiyoruz.
+
+AnyAsync
+    En az bir kayıt var mı diye kontrol eder. Duplicate email kontrolünde
+    bütün kaydı getirmekten daha uygundur.
+
+CountAsync
+    Arama filtresine uyan toplam kayıt sayısını SQL tarafında hesaplar.
+
+AsNoTracking
+    Salt okunur GET sorgularında EF'nin değişiklik takibi yapmasını
+    engeller ve gereksiz maliyeti azaltır.
+
+Add
+    Yeni entity'yi EF'nin ekleme takibine alır.
+
+Remove
+    Entity'yi silinmek üzere işaretler.
+
+SaveChangesAsync
+    Add, update veya Remove ile bellekte takip edilen değişiklikleri
+    gerçekten PostgreSQL'e gönderir. Çağrılmazsa değişiklik kalıcı olmaz.
+
+Select
+    Entity'den yalnızca dışarıya açılacak UserDto alanlarını seçer.
+
+ToListAsync
+    Hazırlanan sorguyu çalıştırıp sonuçları listeye çevirir.
+
+Neden async?
+    Veritabanı ve ağ işlemlerinde cevap beklenirken thread'i gereksiz
+    bloke etmez. Uygulama başka isteklerle ilgilenebilir. Bu nedenle
+    metodlar Task döndürür ve `await` kullanır.
+
+
+18. PAGINATION VE SEARCH NASIL ÇALIŞIYOR?
+-----------------------------------------
+
+Örnek URL:
+
+    /api/User?Page=2&PageSize=2&Search=kaan
+
+Model binding URL'deki Page, PageSize ve Search değerlerini otomatik
+olarak UserListQuery nesnesine çevirir.
+
+UserService içindeki işlem sırası:
+
+1. `_context.Users.AsNoTracking()` ile IQueryable oluşturulur.
+2. Search doluysa Name veya Email için PostgreSQL ILIKE filtresi eklenir.
+3. CountAsync ile filtreye uyan toplam kayıt sayısı bulunur.
+4. Toplam sayfa sayısı hesaplanır.
+5. OrderBy(Name).ThenBy(Id) ile kararlı sıralama yapılır.
+6. Skip ile önceki sayfalardaki kayıtlar atlanır.
+7. Take ile yalnızca istenen sayfa büyüklüğü alınır.
+8. Select ile UserDto oluşturulur.
+9. Sonuç PagedResponse içinde dönülür.
+
+`ThenBy(Id)` önemlidir. Aynı ada sahip kayıtlar olduğunda yalnızca Name
+ile sıralama kararlı olmayabilir ve aynı kayıt farklı sayfalarda tekrar
+görülebilir.
+
+Sınırlar:
+
+- Page en az 1.
+- PageSize 1 ile 100 arasında.
+- Search en fazla 100 karakter.
+- Sonuç bulunmazsa 404 değil, 200 ve boş items listesi döner.
+- Var olmayan yüksek bir sayfa da 200 ve boş items listesi döner.
+
+
+19. MODEL BINDING VE REQUEST BODY
+---------------------------------
+
+Model binding, HTTP isteğindeki URL, query string, route ve JSON body
+değerlerini C# parametre veya model nesnesine çevirir.
+
+Örnekler:
+
+    [FromQuery] UserListQuery query
+        Page, PageSize ve Search URL query stringinden gelir.
+
+    [FromBody] UserCreateModel model
+        Name, Email ve Password JSON request body'den gelir.
+
+    [HttpGet("{id}")] ve GetById(string id)
+        id route içinden gelir.
+
+GET isteklerinde normalde request body kullanılmaz. GET veri okumak
+içindir; filtre ve kimlik bilgileri route veya query string ile verilir.
+Birçok istemci, proxy ve cache GET body'yi güvenilir biçimde işlemez.
+
+POST ve PUT genellikle JSON request body kullanır. DELETE bu projede
+silinen kaydı route ID ile belirlediği için body kullanmaz.
+
+
+20. SWAGGER VE XML AÇIKLAMALARI
+-------------------------------
+
+Swagger, endpointleri tarayıcıda gösteren ve deneyebildiğimiz API
+dokümantasyon ekranıdır. OpenAPI ise bu dokümanın standardıdır.
+
+Controller ve modellerdeki `/// <summary>`, `<param>`, `<returns>`,
+`<response>` ve `<example>` XML yorumları build sırasında XML dosyasına
+yazılır.
+
+StajApi.csproj içindeki:
+
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+XML belgesini üretir. Program.cs içindeki:
+
+    options.IncludeXmlComments(xmlPath);
+
+bu XML açıklamalarını Swagger'a ekler.
+
+`ProducesResponseType`, endpointin hangi HTTP kodunda hangi response
+modelini döndürdüğünü Swagger'a bildirir.
+
+Swagger üzerindeki Authorize düğmesinde login'den alınan JWT girilerek
+korumalı validate endpointi test edilir.
+
+
+21. POSTMAN KOLEKSİYONUNU İÇE AKTARMA
+------------------------------------
+
+Postman açılır:
+
+1. Import seçilir.
+2. `postman/StajApi.postman_collection.json` dosyası seçilir.
+3. `StajApi - User ve JWT İşlemleri` koleksiyonu gelir.
+
+Koleksiyon değişkenleri:
+
+- baseUrl: http://localhost:5039
+- userId: işlemlerde kullanılan kullanıcının GUID değeri
+- userEmail: create/login için email
+- userPassword: create/login için düz test şifresi
+- jwtToken: login test scripti tarafından otomatik doldurulur
+
+Hazır istekler:
+
+1 - User List (GET)
+1A - User Pagination (GET)
+1B - User Search (GET)
+1C - Geçersiz Pagination (GET 400)
+2 - User Tekil Get (GET)
+3 - Geçersiz GUID Hatası (GET 400)
+4 - User Create (POST)
+5 - User Update Name (PUT)
+6 - Login ve JWT Al (POST)
+7 - JWT Validate ve Claimleri Getir (GET)
+8 - User Delete (DELETE)
+
+İsteklerin test scriptleri beklenen status kodlarını ve bazı response
+alanlarını otomatik kontrol eder. Create başarılı olunca dönen GUID
+`userId` değişkenine, login başarılı olunca JWT `jwtToken` değişkenine
+yazılır. Bu yüzden sonraki istekler hazır çalışır.
+
+
+22. ÖNERİLEN POSTMAN TEST SIRASI
+-------------------------------
+
+API ve Docker çalışırken şu sıra izlenebilir:
+
+1.  1 - User List                    -> 200
+2.  1A - User Pagination             -> 200
+3.  1B - User Search                 -> 200
+4.  1C - Geçersiz Pagination         -> 400
+5.  3 - Geçersiz GUID Hatası         -> 400
+6.  4 - User Create                  -> 201
+7.  2 - User Tekil Get               -> 200
+8.  5 - User Update Name             -> 200
+9.  2 - User Tekil Get               -> yeni adı gösterir
+10. 6 - Login ve JWT Al              -> 200 ve token
+11. 7 - JWT Validate                 -> 200 ve claimler
+12. 8 - User Delete                  -> 204
+13. 2 - User Tekil Get               -> 404
+
+Create isteği aynı email ile daha önce çalıştırılmışsa 409 alınır. Böyle
+bir durumda koleksiyondaki `userEmail` değerini benzersiz yeni bir email
+ile değiştir veya önce o kullanıcıyı sil.
+
+
+23. SWAGGER'DA MANUEL TESTLER
+-----------------------------
+
+Liste:
+
+    GET /api/User
+    Page = 1
+    PageSize = 2
+
+İkinci sayfa:
+
+    Page = 2
+    PageSize = 2
+
+Arama:
+
+    Search = kaan
+
+Email araması:
+
+    Search = outlook
+
+Validation testleri:
+
+    Page = 0       -> 400
+    PageSize = 101 -> 400
+
+Create body:
+
+{
+  "name": "Arkadaş Test",
+  "email": "arkadas.test@example.com",
+  "password": "Password123!"
+}
+
+Login body aynı email ve şifreyle gönderilir. Gelen accessToken Swagger
+Authorize alanına yazılır ve `/api/Auth/validate` çağrılır.
+
+
+24. DBEAVER İLE VERİTABANINI GÖRME
+---------------------------------
+
+Yeni PostgreSQL bağlantı bilgileri:
+
+- Host: localhost
+- Port: 5432
+- Database: StajApiDb
+- Username: postgres
+- Password: local Docker PostgreSQL şifresi
+
+Bağlandıktan sonra:
+
+    Databases
+      -> StajApiDb
+        -> Schemas
+          -> public
+            -> Tables
+              -> Users
+
+Users tablosuna sağ tıklayıp View Data / All Rows seçilir.
+
+SQL ile kontrol:
+
+    SELECT "Id", "Name", "Email", "PasswordHash", "UserType"
+    FROM "Users"
+    ORDER BY "Name", "Id";
+
+PostgreSQL büyük/küçük harfe duyarlı tablo ve kolon isimlerinde çift
+tırnak ister. Bu yüzden Users yerine "Users" yazılır.
+
+Create endpointinden 201 alındıktan sonra DBeaver'da refresh yapılınca
+yeni kayıt görünür. PasswordHash alanında düz şifre değil uzun hash
+değeri görülmelidir.
+
+
+25. SEED DATA
+-------------
+
+AppDbContext içindeki HasData ile Fatih, Rüstem ve Kaan başlangıç
+kayıtları tanımlanmıştır. Sabit GUID kullanılmasının nedeni migration
+her üretildiğinde seed kimliklerinin değişmemesidir.
+
+Seed data kodda tanımlanır, migration içine çevrilir ve `database
+update` sırasında veritabanına eklenir. Normal POST ile eklenen kullanıcı
+seed data değildir; API çalışırken PostgreSQL'e eklenen normal kayıttır.
+
+
+26. STAJYER ENDPOINTLERİ
+------------------------
+
+İlk çalışma sırasında oluşturulan bellek içi endpointler:
+
+    GET    /api/Stajyerler
+    GET    /api/Stajyerler/{id}
+    POST   /api/Stajyerler
+    PUT    /api/Stajyerler/{id}
+    DELETE /api/Stajyerler/{id}
+
+Buradaki veriler PostgreSQL Users tablosuna yazılmaz. Uygulama yeniden
+başlatılınca POST ile eklenen stajyerler kaybolur. User endpointlerinden
+temel farkı budur.
+
+
+27. SIK KARŞILAŞILAN HATALAR
+----------------------------
+
+API başlamıyor, Jwt:Key boş hatası:
+    appsettings.Local.json oluştur ve en az 32 karakterlik key yaz.
+
+PostgreSQL connection refused:
+    Docker Desktop ve staj-postgres-1 container'ını çalıştır. Portun
+    5432 olduğunu kontrol et.
+
+Password authentication failed:
+    Docker'daki PostgreSQL şifresi ile appsettings.Local.json içindeki
+    Password aynı değil.
+
+Relation "Users" does not exist:
+    Migration uygulanmamış olabilir. `database update` çalıştır.
+
+Swagger Fetch error:
+    Terminalde gerçek exception'a bak. Önce build al, API'yi yeniden
+    başlat ve /swagger/v1/swagger.json adresini kontrol et.
+
+400 JSON formatı geçersiz:
+    Alanlar arasında virgül olduğuna, son alandan sonra gereksiz virgül
+    olmadığına, tırnak ve parantezlerin kapandığına bak.
+
+400 geçersiz GUID:
+    ID tam GUID formatında olmalıdır. Örnek:
+    11111111-1111-1111-1111-111111111111
+
+401 Unauthorized:
+    Login bilgileri yanlış olabilir. Validate için Authorization header
+    eksik, token hatalı veya süresi geçmiş olabilir.
+
+409 Conflict:
+    Aynı email ile kullanıcı zaten vardır. Farklı email kullan.
+
+404 Not Found:
+    GUID formatı doğrudur fakat bu ID ile kayıt yoktur veya kayıt daha
+    önce silinmiştir.
+
+Kod değişti ama sonuç değişmedi:
+    API'yi Control + C ile kapat, `dotnet build` ve `dotnet run` ile
+    yeniden başlat.
+
+
+28. ARKADAŞ İÇİN TAM KONTROL LİSTESİ
+------------------------------------
+
+[ ] feature/user-pagination branch'i çekildi.
+[ ] appsettings.Local.json kişisel değerlerle oluşturuldu.
+[ ] Docker Desktop açık.
+[ ] staj-postgres-1 çalışıyor.
+[ ] dotnet restore başarılı.
+[ ] dotnet tool restore başarılı.
+[ ] migration database'e uygulandı.
+[ ] dotnet build sıfır hata verdi.
+[ ] dotnet run ile localhost:5039 açıldı.
+[ ] Swagger açıldı.
+[ ] GET pagination ve search denendi.
+[ ] Page=0 ve PageSize=101 için 400 alındı.
+[ ] User Create 201 verdi.
+[ ] DBeaver'da yeni kullanıcı görüldü.
+[ ] PasswordHash alanında düz şifre olmadığı görüldü.
+[ ] Login 200 ve JWT verdi.
+[ ] JWT validate 200 ve claimleri verdi.
+[ ] Update yalnızca Name'i değiştirdi.
+[ ] Delete 204 verdi.
+[ ] Silinen kullanıcı için GET 404 verdi.
+[ ] Postman koleksiyon testleri geçti.
+
+
+29. ARKADAŞ YENİ DEĞİŞİKLİK PUSH EDECEKSE
+-----------------------------------------
+
+Mevcut güncel branch'ten kendi feature branch'ini açması daha düzenlidir:
+
+    git switch feature/user-pagination
+    git pull origin feature/user-pagination
+    git switch -c feature/yeni-ozellik-adi
+
+Değişiklikten sonra:
+
+    dotnet build
+    git status
+    git add DEGISEN_DOSYALAR
+    git commit -m "feat: yapılan değişikliğin kısa açıklaması"
+    git push -u origin feature/yeni-ozellik-adi
+
+`appsettings.Local.json`, gerçek database şifresi ve gerçek JWT key'i
+kesinlikle pushlanmamalıdır.
+
+
+30. HOCAYA KISA ANLATIM
+-----------------------
+
+"User işlemlerini bellekten çıkarıp Entity Framework Core ile Docker'da
+çalışan PostgreSQL veritabanına bağladık. Controller'ı sade tutup iş
+kuralları ve database işlemlerini IUserService sözleşmesini uygulayan
+UserService'e taşıdık. Request modellerinde model validation, service
+katmanında iş kuralı validation ve AppDbContext içinde database
+constraintleriyle üç katmanlı doğrulama yaptık. Hataları özel exception
+olarak service'ten çıkarıp GlobalExceptionHandler ile ortak JSON ve
+doğru HTTP kodlarına çevirdik. Kullanıcı şifresini düz metin yerine
+hashleyerek sakladık. Login başarılıysa type ve role dahil claimleri
+olan JWT ürettik; Authorize kullanılan endpointte tokenı doğrulayıp
+claimleri döndürdük. Liste endpointine PostgreSQL ILIKE araması ve
+Page/PageSize tabanlı pagination ekledik. Swagger dokümantasyonunu ve
+Postman otomatik test koleksiyonunu da güncelledik."
+
+
+31. BUGÜNE KADAR TAMAMLANANLAR
+------------------------------
+
+- .NET 10 Web API projesi oluşturuldu.
+- Program.cs ve appsettings dosyalarının görevleri öğrenildi.
+- Controller, route, endpoint, HTTP metotları ve request body öğrenildi.
+- Stajyer için GET, tekil GET, POST, PUT ve DELETE yazıldı.
+- Postman ile 200, 201, 204 ve 404 cevapları test edildi.
+- Swagger kuruldu ve bütün endpointler dokümante edildi.
+- XML yorumları, example ve response tipleri Swagger'a eklendi.
+- GitHub repo ve feature branch çalışma düzeni kullanıldı.
+- Docker üzerinde PostgreSQL çalıştırıldı.
+- EF Core ve Npgsql paketleri eklendi.
+- AppDbContext ve User entity oluşturuldu.
+- Code First migration ile Users tablosu oluşturuldu.
+- Seed kullanıcılar migration ile eklendi.
+- User CRUD verileri PostgreSQL'e taşındı.
+- Request, response, entity, interface, service ve data klasörleri ayrıldı.
+- IUserService ve UserService kullanıldı.
+- Dependency Injection kayıtları Program.cs'e eklendi.
+- Controller sadeleştirildi; iş ve hata mantığı service'e taşındı.
+- Model, service ve database validation uygulandı.
+- Sade ortak hata response'u ve GlobalExceptionHandler yazıldı.
+- Geçersiz GUID için anlaşılır 400 hatası eklendi.
+- Email unique kuralı ve 409 Conflict cevabı eklendi.
+- PasswordHash ve UserType kolonları migration ile eklendi.
+- Şifreler PasswordHasher ile hashlenerek saklandı.
+- Login endpointi ve JWT Bearer authentication eklendi.
+- JWT doğrulama endpointi ve claim response'u eklendi.
+- JWT'ye sub, jti, name, email, type ve role claimleri eklendi.
+- Swagger'a Bearer Authorize desteği eklendi.
+- DBeaver ile tablo, kolon ve kayıtlar kontrol edildi.
+- Postman koleksiyonu, değişkenleri ve otomatik testleri hazırlandı.
+- User list endpointine pagination eklendi.
+- Name ve Email için büyük/küçük harf duyarsız search eklendi.
+- Pagination response'una toplam kayıt ve sayfa bilgileri eklendi.
+- Kararlı sıralama için Name sonrasında Id sıralaması eklendi.
+- Pagination, search, validation ve CRUD regresyon testleri tamamlandı.
+
+Bu dosya güncel olarak `feature/user-pagination` branch'indeki kodu
+anlatır.
